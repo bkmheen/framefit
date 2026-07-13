@@ -3,6 +3,16 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.2.1] - 2026-07-13
+
+### Fixed
+- C3 Hough detector crashed on OpenCV 5.0 (`HoughLinesP` returns `(N,4)`);
+  reshape made it robust. Now 5/11 on samples.
+
+### Added
+- C5 deep-learning candidate `detectors_dl.py` (DocAligner heatmap corner model);
+  `run_benchmark.py` folds it in when available (`FRAMEFIT_DL=0` to skip).
+
 ## [0.2.0] - 2026-07-13
 
 ### Added

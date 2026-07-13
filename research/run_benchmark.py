@@ -24,6 +24,15 @@ import pillow_heif
 
 from detectors import DETECTORS, order_corners, quad_area
 
+# Optionally fold in the deep-learning candidate (C5) when available.
+DETECTORS = dict(DETECTORS)
+if os.environ.get("FRAMEFIT_DL", "1") != "0":
+    try:
+        from detectors_dl import DL_DETECTORS
+        DETECTORS.update(DL_DETECTORS)
+    except Exception as e:  # noqa
+        print(f"[info] DL candidate unavailable, skipping: {e}")
+
 pillow_heif.register_heif_opener()
 
 ROOT = Path(__file__).resolve().parent.parent

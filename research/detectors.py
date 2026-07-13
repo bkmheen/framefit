@@ -117,8 +117,9 @@ def detect_hough(img: np.ndarray):
                             minLineLength=min(h, w) // 3, maxLineGap=40)
     if lines is None:
         return None
+    lines = np.asarray(lines).reshape(-1, 4)  # cv2 5.0 may return (N,4) or (N,1,4)
     horis, verts = [], []
-    for l in lines[:, 0, :]:
+    for l in lines:
         x1, y1, x2, y2 = l
         ang = np.degrees(np.arctan2(y2 - y1, x2 - x1))
         if abs(ang) < 30 or abs(ang) > 150:
