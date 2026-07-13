@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "framefit"
-version = "0.4.0"
+version = "0.4.1"
 description = "Detect a document or presentation slide in a photo, correct its perspective, and crop it to a clean full-frame image."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
-authors = [{ name = "mheens", email = "admin@mheens.com" }]
+authors = [{ name = "Bongki Mheen", email = "bkmheen@gmail.com" }]
 keywords = ["document-scanner", "perspective-correction", "dewarp", "slide", "opencv"]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",

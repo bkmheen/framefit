@@ -3,6 +3,12 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.4.1] - 2026-07-13
+
+### Changed
+- Set copyright holder / author to **Bongki Mheen (bkmheen@gmail.com)** in NOTICE
+  and pyproject; aligned git commit identity for future commits.
+
 ## [0.4.0] - 2026-07-13
 
 ### Added
