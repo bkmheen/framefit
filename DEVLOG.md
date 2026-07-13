@@ -2,6 +2,21 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.2.4 — Scenario A result: A1 gamma-lift → C5 wins
+
+Ran raw/A1/A2/A3 × C5 on all 11. **A1 (gamma/shadow lift) is the clear winner**:
+mean aspect-ratio score 0.99 vs raw 0.95, detected area up (~0.37→0.5), and — the
+point — visually it recovers the full slide including the dark header and removes
+the shear that broke raw C5 on IMG_3643. A2/A3 no better than raw on this set.
+
+Mechanism: lifting shadows makes the whole physical projector screen visible, so
+the DL model sees a clean rectangle and locks the true corners; we then warp from
+the untouched original. Confirms the user's hypothesis exactly.
+
+MVP core decided: **A1 gamma-lift → C5 DocAligner → warp-from-original.** Residual:
+thin screen-bezel margin (benign). Next: tighten bezel; scenario B1 (C2/C4 ROI
+prior → C5) as fallback; scenario-C scoring for auto-pick. See `research/RESULTS_A.md`.
+
 ## 2026-07-13 — v0.2.3 — Scenario A: tone preprocessing → C5
 
 User direction: C5 (DL) looked most promising; attack its failure mode by changing

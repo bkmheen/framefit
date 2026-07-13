@@ -3,6 +3,16 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.2.4] - 2026-07-13
+
+### Findings
+- Scenario A result (`research/RESULTS_A.md`): **A1 gamma/shadow lift → C5 is the
+  clear winner.** Lifting shadows reveals the whole projector screen, so DocAligner
+  locks the true 4 corners. Fixes both the header-clipping (IMG_3640) and the shear
+  (IMG_3643) seen with raw C5. Mean aspect-ratio score 0.99 (raw 0.95); no
+  regressions. A2/A3 did not beat raw.
+- Adopted MVP core: A1 gamma-lift → C5 DocAligner → warp-from-original.
+
 ## [0.2.3] - 2026-07-13
 
 ### Added
