@@ -1,6 +1,6 @@
 # framefit
 
-**Version:** 0.4.1
+**Version:** 0.5.0
 
 Detect a document or presentation slide inside a photo, correct its perspective,
 and crop it to a clean full-frame image.

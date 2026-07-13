@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "framefit"
-version = "0.4.1"
+version = "0.5.0"
 description = "Detect a document or presentation slide in a photo, correct its perspective, and crop it to a clean full-frame image."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -38,6 +38,12 @@ heic = ["pillow-heif"]
 
 # Everything (convenience).
 all = ["framefit[dl,heic]"]
+
+# Development / testing.
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.scripts]
 framefit = "framefit.cli:main"

@@ -25,4 +25,6 @@ env/
 /output/
 /research/out/
 /research/out_dl/
+/research/out_final/
+/framefit_out/
 *.HEIC

@@ -2,6 +2,16 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.5.0 — Quality pass: auto best-of + tests + gallery
+
+Robustness polish. `AutoDetector` runs the available backends and keeps the more
+slide-like quad (aspect-ratio score), with DocAligner preferred and classic as a
+guaranteed offline fallback. It's a single Detector instance (model loads once),
+so batch CLI stays fast. Added smoke tests for the permissive core and a gallery
+generator to eyeball the final results across all 11 samples. (v0.4.1 set the
+copyright/author to Bongki Mheen — see [[framefit-copyright]].) Next: run tests +
+gallery, confirm quality, then public-release prep.
+
 ## 2026-07-13 — v0.4.0 — MVP package + CLI
 
 Turned the validated research into `src/framefit/`. Backend abstraction realises

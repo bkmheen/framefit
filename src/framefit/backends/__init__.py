@@ -20,14 +20,9 @@ def get_backend(name: str = "auto") -> Detector:
 
         return DocAlignerDetector()
     if name == "auto":
-        try:
-            from .docaligner import DocAlignerDetector
+        from .auto import AutoDetector
 
-            return DocAlignerDetector()
-        except ImportError:
-            from .classic import ClassicDetector
-
-            return ClassicDetector()
+        return AutoDetector()
     raise ValueError(f"Unknown backend: {name!r} (use auto|classic|docaligner)")
 
 

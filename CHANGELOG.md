@@ -3,6 +3,20 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.5.0] - 2026-07-13
+
+### Added
+- `AutoDetector` best-of/fallback backend: prefers DocAligner (when installed),
+  falls back to the classical core, and picks the more slide-like quad by
+  aspect-ratio score. Instantiated once, reused across a batch (model loads once).
+- Smoke tests (`tests/`, `dev` extra) covering geometry, classic backend, and the
+  process pipeline — no DL/HEIC needed.
+- `research/make_gallery.py`: builds a before/after gallery of the installed
+  package over the samples (`research/out_final/`, gitignored).
+
+### Changed
+- `get_backend("auto")` now returns `AutoDetector` (was: bare DocAligner/classic).
+
 ## [0.4.1] - 2026-07-13
 
 ### Changed
