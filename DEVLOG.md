@@ -2,6 +2,24 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.6.1 — Fix refine over-crop; reject 180° idea
+
+User found the 0.6.0 trim cut content (IMG_3646 "DYNAMIC OPTICS" logo top) — a
+regression, since pre-trim never cut. Two threads:
+
+1. **User's 180° idea** (rotate so the well-fit bottom handles the top, then rotate
+   back). Tested on all 11: top empty margin ~unchanged (normal vs rot180 both
+   ~11–12%), one case worse. Reason: the bottom fits well because of bright-content
+   *contrast*, not position; rotating carries the low-contrast dark-header edge to
+   the bottom but it still overshoots. Rejected (kept as a documented negative).
+
+2. **Real fix.** Measured the top-region profile of a pre-trim output: empty gap is
+   near-black (~0.09) with neutral/negative blueness; the navy header is ~0.16+ and
+   blue-positive. The old `dark_ratio=0.40` swept the header into "margin" and cut
+   it. Lowered to 0.12 (near-black only) → trims the empty gap, stops at the header.
+   Verified: IMG_3646 logo intact, IMG_3640 fine; most tops ≤3%, a few ~10% (safe).
+   Priority honored: never cut > minimize margin. Regression test added.
+
 ## 2026-07-13 — v0.6.0 — Edge refinement (top-margin trim)
 
 User noticed a residual dark band at the top of the outputs. Measured it: ~15%

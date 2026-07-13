@@ -53,17 +53,20 @@ def aspect_score(quad: np.ndarray) -> float:
 
 def trim_dark_margins(
     image: np.ndarray,
-    dark_ratio: float = 0.40,
+    dark_ratio: float = 0.12,
     var_max: float = 0.11,
     max_trim: float = 0.30,
 ) -> tuple[np.ndarray, tuple[int, int, int, int]]:
-    """Trim uniformly-dark border bands (bezel/gap) from a rectified image.
+    """Trim near-black border bands (bezel/room gap) from a rectified image.
 
-    A border row/column is trimmed only while it is both dark (mean below
-    ``dark_ratio``) and near-uniform (std below ``var_max``), so textured content
-    is never cut. Each edge is trimmed independently, capped at ``max_trim`` of the
-    side length. Returns the cropped image and the (top, bottom, left, right) pixels
-    removed. Values are fractions of 255.
+    A border row/column is trimmed only while it is both near-black (mean below
+    ``dark_ratio``) and near-uniform (std below ``var_max``), so content is never
+    cut. ``dark_ratio`` is deliberately low (~0.12): the empty room/bezel above a
+    slide sits near black (~0.09), while a dark slide header (e.g. a navy title bar,
+    ~0.16+) is above it and must be preserved — a higher threshold would eat the
+    header. Each edge is trimmed independently, capped at ``max_trim`` of the side
+    length. Returns the cropped image and (top, bottom, left, right) pixels removed.
+    Values are fractions of 255.
     """
     g = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
     h, w = g.shape

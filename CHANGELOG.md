@@ -3,6 +3,23 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.6.1] - 2026-07-13
+
+### Fixed
+- **Refine no longer cuts content.** `trim_dark_margins` default `dark_ratio`
+  lowered 0.40 → 0.12. Root cause (measured): the dark navy slide header sits at
+  ~0.16 brightness while the empty room/bezel above it is ~0.09; the old 0.40
+  threshold treated the header as margin and cut it (e.g. the "DYNAMIC OPTICS"
+  logo top on IMG_3646). The lower near-black threshold trims only the empty gap
+  and stops at the header. Never cuts on the sample set; most tops ≤3% residual,
+  a few ~10% (safe margin retained over cutting).
+- Added a regression test for preserving a dim (non-black) header band.
+
+### Investigated (not adopted)
+- 180° re-detection idea: measured on all 11 — the top margin is essentially
+  unchanged (bottom fits well due to bright-content contrast, not position; the
+  low-contrast dark-header edge overshoots regardless of orientation). Rejected.
+
 ## [0.6.0] - 2026-07-13
 
 ### Added

@@ -82,3 +82,15 @@ def test_trim_preserves_textured_dark_edge():
     img[:40, ::6, :] = 250  # vertical stripes -> high variance -> content
     out, (t, _, _, _) = trim_dark_margins(img)
     assert t == 0  # textured band kept
+
+
+def test_trim_preserves_dim_header_band():
+    # regression: a dim-but-not-black uniform band (like a navy header, ~0.17)
+    # sitting under a thin near-black margin must NOT be trimmed away.
+    img = np.full((300, 400, 3), 230, np.uint8)
+    img[:20, :, :] = 8    # near-black empty margin (trim this)
+    img[20:70, :, :] = 44  # dim navy-ish header band ~0.17 (keep this)
+    from framefit.geometry import trim_dark_margins
+
+    _, (t, _, _, _) = trim_dark_margins(img)
+    assert 15 <= t <= 22  # only the near-black margin removed, header kept
