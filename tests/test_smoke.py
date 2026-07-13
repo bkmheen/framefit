@@ -41,6 +41,8 @@ def test_aspect_helpers():
     assert aspect_score(quad) > 0.99  # 16:10 is a standard ratio
     smaller = inset_quad(quad, 0.1)
     assert smaller[0][0] > 0 and smaller[2][0] < 160  # moved inward
+    bigger = inset_quad(quad, -0.1)  # negative -> expand outward (safety margin)
+    assert bigger[0][0] < 0 and bigger[2][0] > 160
 
 
 def test_classic_backend_detects_synthetic_slide():

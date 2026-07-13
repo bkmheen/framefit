@@ -3,6 +3,24 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.7.0] - 2026-07-13
+
+### Added
+- **Safety expansion** (`process_image(expand=0.04)`, default on; CLI `--expand`).
+  Grows the detected quad outward before warping so a slightly-inaccurate detection
+  never crops into content (fixes titles flush to the slide's top edge, e.g.
+  IMG_3636/3637). The refine pass reclaims the added margin where it is genuinely
+  empty, so the common case stays tight (navy set AR essentially unchanged).
+- **QA report** (`framefit_report.tsv` written to the output dir; CLI
+  `--review-threshold`, default 0.90). Lists per-file aspect ratio + score and
+  flags low-score / missed / errored results as REVIEW so hard cases (e.g. the
+  bright pull-down-screen template) surface for manual check. The run summary
+  prints how many were flagged.
+
+### Fixed
+- `inset_quad` ignored negative fractions (expansion was a silent no-op); it now
+  scales about the centroid in both directions.
+
 ## [0.6.2] - 2026-07-13
 
 ### Added

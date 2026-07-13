@@ -139,10 +139,15 @@ def trim_dark_margins(
 
 
 def inset_quad(quad: np.ndarray, frac: float) -> np.ndarray:
-    """Move each corner toward the centroid by `frac` (e.g. 0.01 trims a bezel)."""
-    if frac <= 0:
-        return np.asarray(quad, dtype=np.float32)
+    """Scale the quad about its centroid.
+
+    Positive ``frac`` moves each corner toward the centroid (inset, e.g. 0.01 trims
+    a bezel); negative ``frac`` moves them outward (expand, a safety margin so a
+    slightly-inaccurate detection never crops into content).
+    """
     quad = np.asarray(quad, dtype=np.float32)
+    if frac == 0:
+        return quad
     c = quad.mean(axis=0)
     return (quad + (c - quad) * frac).astype(np.float32)
 

@@ -36,10 +36,17 @@ def process_image(
     image: np.ndarray,
     backend: Union[str, Detector] = "auto",
     inset: float = 0.0,
+    expand: float = 0.04,
     detect_max: int = 1400,
     refine: bool = True,
 ) -> Result:
     """Detect the slide in a BGR image and return the rectified full-frame crop.
+
+    ``expand`` grows the detected quad outward by this fraction before warping — a
+    safety margin so a slightly-inaccurate detection never crops into content (e.g.
+    a title flush to the slide's top edge). The following ``refine`` pass reclaims
+    the added margin wherever it is genuinely empty (dark), so on the common case
+    the result stays tight while content is protected.
 
     When ``refine`` is set (default), uniformly-dark border bands left by an
     imprecise edge (typically the top, above a dark header) are trimmed off the
@@ -60,7 +67,7 @@ def process_image(
         return Result(False, None, None, det.name)
 
     quad = order_corners(quad_small / scale)
-    quad = inset_quad(quad, inset)
+    quad = inset_quad(quad, inset - expand)  # net: shrink by inset, grow by expand
     warped = warp_from_quad(image, quad)
     if refine:
         warped, _ = trim_dark_margins(warped)
@@ -74,13 +81,14 @@ def process_file(
     dst: Union[str, Path],
     backend: Union[str, Detector] = "auto",
     inset: float = 0.0,
+    expand: float = 0.04,
     detect_max: int = 1400,
     refine: bool = True,
     quality: int = 95,
 ) -> Result:
     """Load `src`, process it, and write the rectified crop to `dst`."""
     image = io.load_bgr(src)
-    result = process_image(image, backend=backend, inset=inset,
+    result = process_image(image, backend=backend, inset=inset, expand=expand,
                            detect_max=detect_max, refine=refine)
     if result.ok and result.image is not None:
         io.save_bgr(result.image, dst, quality=quality)

@@ -2,6 +2,29 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.7.0 — Safety expansion + QA report (real-world batch)
+
+Real-world run over all `source/` HEIC (20 files, 6 sessions) exposed two DETECTION
+failure modes (trim was innocent — norefine==refine):
+- **White-bg flush-title** (3636/3637): DocAligner's small top error clips a title
+  sitting flush to the slide top.
+- **Bright pull-down-screen room** (3652/3655/3657/3658): DocAligner *fails* (no
+  4-corner poly) → auto falls back to classic, which grabs the bright body and cuts
+  the darker header. Both backends weak on this scene.
+
+Fixes shipped:
+1. **Safety expansion** — grow the detected quad ~4% before warp; refine reclaims
+   the empty part. Fixes flush-title (white margin protects the title); neutral on
+   the navy set (dark surround reclaimed). NOTE: found and fixed a latent bug —
+   `inset_quad` ignored negative fracs, so expansion had been a no-op; verified the
+   real effect after the fix.
+2. **QA report** — `framefit_report.tsv` + review flag (score < 0.90). aspect_score
+   reliably flags the bright-room cases, so a general tool surfaces "check these N"
+   instead of silently mis-cropping.
+
+Bright-room detection itself (scenario #3) deferred — needs a screen/edge or
+saturation-based detector; the primary dark-auditorium navy template is solid.
+
 ## 2026-07-13 — v0.6.2 — Header-aware top trim (last 3 residual margins)
 
 Only IMG_3640/3641/3642 kept a top margin after 0.6.1. Measured why: their gap
