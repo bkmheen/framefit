@@ -1,6 +1,6 @@
 # framefit
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Detect a document or presentation slide inside a photo, correct its perspective,
 and crop it to a clean full-frame image.
@@ -11,7 +11,8 @@ distortion, and saves the flattened, full-frame result.
 
 ## Status
 
-Early scaffolding. Design and implementation in progress.
+Early scaffolding. Benchmarking candidate detection strategies (see `research/`)
+to set a baseline before committing to the final pipeline.
 
 ## Planned pipeline
 
@@ -19,6 +20,14 @@ Early scaffolding. Design and implementation in progress.
 2. **Correct** perspective (dewarp the keystone).
 3. **Crop** to the slide bounds — full frame, edges trimmed.
 4. **Save** the flattened image.
+
+## Repository layout
+
+- `samples/` — local HEIC test photos (gitignored) + `MANIFEST.tsv`.
+- `research/` — candidate detection strategies and the benchmark harness.
+  - `detectors.py` — classical-CV slide-detection candidates.
+  - `run_benchmark.py` — runs every candidate over the samples, writes
+    `research/out/report.html` (gitignored) with side-by-side results.
 
 ## Project records
 

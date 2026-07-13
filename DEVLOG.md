@@ -2,6 +2,32 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.2.0 — Candidate survey & benchmark harness
+
+**Open-source survey.** Landscape for "photo → detect slide/document → perspective
+correct → crop":
+- Classical OpenCV document scanners (andrewdcampbell/OpenCV-Document-Scanner,
+  Python-Document-Scanner-OpenCV): grayscale → edge/threshold → largest 4-pt
+  contour → `getPerspectiveTransform` + `warpPerspective`. Fast, dependency-light.
+- jscanify (puffinsoft): browser/Node, OpenCV.js corner detection + undistort.
+- DocAligner (DocsaidLab): DL heatmap regression of 4 corners (facial-keypoint
+  style). Robust but needs model download.
+- DocScanner (fh2019ustc, IJCV'25): DL document image rectification (handles
+  curved warps, heavier).
+
+**Decision.** Benchmark 4 classical candidates in-repo (guaranteed to run offline)
++ evaluate DocAligner as the DL reference. Selected candidates:
+- C1 `canny`    — Canny edges → largest convex quad contour.
+- C2 `bright`   — Otsu brightness threshold → largest bright quad (tailored to the
+  dark-auditorium / bright-screen scene; expected strongest here).
+- C3 `hough`    — HoughLinesP → group into H/V edges → 4 intersections.
+- C4 `minarearect` — rotated bounding box of largest bright blob (rotation-only
+  baseline; no keystone correction, shows the value of true perspective warp).
+
+**Harness.** `research/run_benchmark.py` detects on a 1400px downscale (speed),
+warps at full resolution, and emits an HTML grid (overlay + warped output per
+sample×candidate) plus results.csv. Outputs gitignored under `research/out/`.
+
 ## 2026-07-13 — v0.1.0 — Project bootstrap
 
 **Goal.** Utility that reads a photo, recognizes the document/presentation slide

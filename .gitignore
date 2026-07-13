@@ -23,4 +23,5 @@ env/
 # Local sample data / outputs (keep the repo clean)
 /samples/
 /output/
+/research/out/
 *.HEIC
