@@ -1,6 +1,6 @@
 # framefit
 
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 Detect a document or presentation slide inside a photo, correct its perspective,
 and crop it to a clean full-frame image.
@@ -22,6 +22,16 @@ selected the approach.
 framefit photo.jpg                       # -> framefit_out/photo_framefit.jpg
 framefit slides/ -o out/ -f png          # batch a folder, PNG output
 framefit talk.heic -b docaligner --inset 0.01   # DL backend, trim a thin bezel
+```
+
+Batch runs write `framefit_report.tsv` and flag hard shots for review (⚠ REVIEW —
+e.g. the deep-learning detector fell back to the classical core). Fix a flagged
+image by hand with the corner picker:
+
+```bash
+framefit tricky.heic --pick -o out/      # writes out/tricky_pick.html
+# open the HTML, click the 4 slide corners, then run the command it prints:
+framefit tricky.heic --corners "x1,y1 x2,y2 x3,y3 x4,y4" -o out/
 ```
 
 Python API:

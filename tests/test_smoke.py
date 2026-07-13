@@ -63,6 +63,27 @@ def test_process_image_classic():
     assert r.ok and r.image is not None and r.aspect_score > 0.8
 
 
+def test_process_manual():
+    from framefit.pipeline import process_manual
+
+    img, truth = _synthetic_slide()
+    r = process_manual(img, truth)
+    assert r.ok and r.backend == "manual"
+    assert r.image.mean() > 180  # rectified to the bright slide
+
+
+def test_picker_writes_html(tmp_path):
+    import cv2
+    from framefit.picker import write_picker_html
+
+    img, _ = _synthetic_slide()
+    src = tmp_path / "slide.png"
+    cv2.imwrite(str(src), img)
+    out = write_picker_html(src, tmp_path / "slide_pick.html", out_dir="o")
+    html = out.read_text()
+    assert "corner picker" in html and "--corners" in html and str(src) in html
+
+
 def test_trim_dark_margins():
     from framefit.geometry import trim_dark_margins
 

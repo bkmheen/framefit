@@ -3,6 +3,23 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.8.0] - 2026-07-13
+
+### Added
+- **Reliable low-confidence flag (B).** `Result.low_confidence` is set when the
+  auto backend's DL detector fails and it falls back to the classical core.
+  Verified this cleanly separates the good shots (DocAligner OK on navy + white
+  templates) from the hard bright pull-down-screen shots (DocAligner FAIL) — it
+  catches the cut cases the aspect-score threshold missed (e.g. IMG_3658). The CLI
+  review flag and `framefit_report.tsv` now use it (with score as a secondary
+  signal) and record the actual backend used.
+- **Manual corner interface (C).**
+  - `framefit --pick` writes a self-contained HTML corner-picker per image; click
+    the 4 corners in a browser and it prints the ready-to-run command (headless —
+    just writes a file). `picker.py`.
+  - `framefit --corners "x1,y1 x2,y2 x3,y3 x4,y4"` and `pipeline.process_manual()`
+    rectify from user-supplied corners, bypassing detection.
+
 ## [0.7.0] - 2026-07-13
 
 ### Added

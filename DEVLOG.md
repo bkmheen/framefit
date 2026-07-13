@@ -2,6 +2,25 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.8.0 — Honest cut flag (B) + manual corner interface (C)
+
+Decided against forcing an auto-crop for the bright pull-down-screen room —
+saturation/projection detection captured the full slide but couldn't tighten
+(colored ceiling spill defeats color/brightness separation; stricter thresholds
+fragmented). So: flag honestly + give a manual escape hatch.
+
+B — reliable flag: measured that **DocAligner succeeds on every good shot (navy +
+white templates) and fails on all four bright shots**. So "DL fell back to classic"
+= low confidence is a clean, reliable cut signal (catches IMG_3658 that the 0.90
+aspect-score threshold missed). AutoDetector now records `last_source`; pipeline
+sets `Result.low_confidence`; CLI review flag uses it first, score second, and the
+report records the actual backend.
+
+C — manual: `--pick` writes an HTML corner-picker (browser click → prints the
+`--corners` command; headless, no GUI needed since opencv is headless);
+`--corners` / `process_manual()` rectify from user corners. Tests cover manual +
+picker. Bright-room auto-crop stays out of scope by design.
+
 ## 2026-07-13 — v0.7.0 — Safety expansion + QA report (real-world batch)
 
 Real-world run over all `source/` HEIC (20 files, 6 sessions) exposed two DETECTION

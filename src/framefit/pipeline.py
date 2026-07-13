@@ -30,6 +30,7 @@ class Result:
     backend: str
     aspect_ratio: float = 0.0
     aspect_score: float = 0.0
+    low_confidence: bool = False       # DL detector fell back to the classical core
 
 
 def process_image(
@@ -72,8 +73,30 @@ def process_image(
     if refine:
         warped, _ = trim_dark_margins(warped)
 
+    src = getattr(det, "last_source", None)          # AutoDetector reports its sub
+    backend_name = src or det.name
+    low_conf = det.name == "auto" and src != "docaligner"  # DL fell back → low conf
     oh, ow = warped.shape[:2]
-    return Result(True, warped, quad, det.name, ow / oh, aspect_score_wh(ow, oh))
+    return Result(True, warped, quad, backend_name, ow / oh,
+                  aspect_score_wh(ow, oh), low_conf)
+
+
+def process_manual(
+    image: np.ndarray,
+    corners,
+    refine: bool = False,
+    expand: float = 0.0,
+) -> Result:
+    """Rectify using four user-supplied corners (any order) in ORIGINAL-image
+    pixel coordinates — the manual escape hatch for shots the detector can't crop."""
+    quad = order_corners(np.asarray(corners, dtype=np.float32))
+    if expand:
+        quad = inset_quad(quad, -expand)
+    warped = warp_from_quad(image, quad)
+    if refine:
+        warped, _ = trim_dark_margins(warped)
+    oh, ow = warped.shape[:2]
+    return Result(True, warped, quad, "manual", ow / oh, aspect_score_wh(ow, oh), False)
 
 
 def process_file(

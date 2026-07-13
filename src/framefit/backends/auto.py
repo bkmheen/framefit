@@ -22,6 +22,10 @@ class AutoDetector(Detector):
 
     def __init__(self, min_score: float = 0.80):
         self.min_score = min_score
+        #: name of the sub-backend that produced the most recent result. When this
+        #: is not "docaligner", the deep-learning detector failed and we fell back
+        #: to the classical core — a reliable low-confidence signal.
+        self.last_source: Optional[str] = None
         self._subs: list[Detector] = []
         try:
             from .docaligner import DocAlignerDetector
@@ -32,14 +36,16 @@ class AutoDetector(Detector):
         self._subs.append(ClassicDetector())
 
     def detect(self, bgr: np.ndarray) -> Optional[np.ndarray]:
-        best_quad, best_score = None, -1.0
+        best_quad, best_score, best_src = None, -1.0, None
         for sub in self._subs:
             quad = sub.detect(sub.preprocess(bgr))
             if quad is None:
                 continue
             score = aspect_score(quad)
             if score >= self.min_score:
-                return quad  # good enough; keep the higher-priority backend's result
+                self.last_source = sub.name  # good enough; keep this backend
+                return quad
             if score > best_score:
-                best_quad, best_score = quad, score
+                best_quad, best_score, best_src = quad, score, sub.name
+        self.last_source = best_src
         return best_quad

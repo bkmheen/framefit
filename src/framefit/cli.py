@@ -47,6 +47,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--review-threshold", type=float, default=0.90,
                    help="flag results below this aspect-ratio score for review "
                         "in framefit_report.tsv (default: 0.90)")
+    p.add_argument("--corners", default=None,
+                   help="manual mode (single image): 4 'x,y' corners TL TR BR BL in "
+                        "original-image pixels, e.g. --corners \"10,20 900,25 890,600 5,590\"")
+    p.add_argument("--pick", action="store_true",
+                   help="don't process — write an HTML corner-picker per input to "
+                        "the output dir (use for images flagged for review)")
     p.add_argument("-f", "--format", default="jpg",
                    choices=["jpg", "png"], help="output format (default: jpg)")
     p.add_argument("--quality", type=int, default=95, help="JPEG quality (1-100)")
@@ -56,6 +62,13 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _parse_corners(s: str):
+    pts = [tuple(float(v) for v in p.split(",")) for p in s.split()]
+    if len(pts) != 4 or any(len(p) != 2 for p in pts):
+        raise ValueError("--corners needs exactly 4 'x,y' points")
+    return pts
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     files = _expand_inputs(args.inputs)
@@ -63,8 +76,33 @@ def main(argv: list[str] | None = None) -> int:
         print("framefit: no input images found", file=sys.stderr)
         return 2
 
-    backend = get_backend(args.backend)  # instantiate once (loads model if any)
     outdir = Path(args.output)
+
+    # --pick: write an HTML corner-picker per input, don't process
+    if args.pick:
+        from .picker import write_picker_html
+        for f in files:
+            html = write_picker_html(f, outdir / f"{f.stem}_pick.html", out_dir=str(outdir))
+            print(f"[pick] {f.name} -> {html}")
+        print(f"\nOpen the *_pick.html file(s), click 4 corners, run the printed command.")
+        return 0
+
+    # --corners: manual single-image mode
+    if args.corners is not None:
+        if len(files) != 1:
+            print("framefit: --corners works on a single image", file=sys.stderr)
+            return 2
+        from . import io
+        from .pipeline import process_manual
+        f = files[0]
+        image = io.load_bgr(f)
+        r = process_manual(image, _parse_corners(args.corners), refine=args.refine)
+        dst = outdir / f"{f.stem}_framefit.{args.format}"
+        io.save_bgr(r.image, dst, quality=args.quality)
+        print(f"[manual] {f.name} -> {dst}  (AR {r.aspect_ratio:.2f})")
+        return 0
+
+    backend = get_backend(args.backend)  # instantiate once (loads model if any)
     ok_count = 0
     rows = []  # (source, output, ok, ar, score, review)
     for f in files:
@@ -80,29 +118,33 @@ def main(argv: list[str] | None = None) -> int:
             continue
         if r.ok:
             ok_count += 1
-            review = r.aspect_score < args.review_threshold
+            # low_confidence (DL fell back to classic) is the reliable cut signal;
+            # a low aspect score is a secondary flag.
+            review = r.low_confidence or r.aspect_score < args.review_threshold
+            status = "REVIEW" if review else "ok"
             rows.append((str(f), out_name, 1, r.aspect_ratio, r.aspect_score,
-                         "REVIEW" if review else "ok"))
+                         r.backend, status))
+            reason = " [low-confidence: DL fell back]" if r.low_confidence else ""
             print(f"[ok]   {f.name} -> {dst}  (AR {r.aspect_ratio:.2f}, "
                   f"score {r.aspect_score:.2f}, {r.backend})"
-                  f"{'  ⚠ REVIEW' if review else ''}")
+                  f"{'  ⚠ REVIEW' + reason if review else ''}")
         else:
-            rows.append((str(f), "", 0, 0.0, 0.0, "MISS"))
+            rows.append((str(f), "", 0, 0.0, 0.0, "-", "MISS"))
             print(f"[miss] {f.name}: no slide detected", file=sys.stderr)
 
     # QA report (#2): per-file score + review flag
-    review_n = sum(1 for r in rows if r[5] in ("REVIEW", "MISS", "ERROR"))
+    review_n = sum(1 for r in rows if r[6] in ("REVIEW", "MISS", "ERROR"))
     if rows:
         outdir.mkdir(parents=True, exist_ok=True)
         with open(outdir / "framefit_report.tsv", "w") as rep:
-            rep.write("source\toutput\tok\taspect_ratio\tscore\tstatus\n")
-            for src, out, ok, ar, sc, st in rows:
-                rep.write(f"{src}\t{out}\t{ok}\t{ar:.3f}\t{sc:.3f}\t{st}\n")
+            rep.write("source\toutput\tok\taspect_ratio\tscore\tbackend\tstatus\n")
+            for src, out, ok, ar, sc, be, st in rows:
+                rep.write(f"{src}\t{out}\t{ok}\t{ar:.3f}\t{sc:.3f}\t{be}\t{st}\n")
 
     print(f"\nframefit: {ok_count}/{len(files)} succeeded ({backend.name} backend)")
     if review_n:
-        print(f"         {review_n} flagged for review (score < {args.review_threshold} "
-              f"or failed) — see {outdir/'framefit_report.tsv'}")
+        print(f"         {review_n} flagged for review — see {outdir/'framefit_report.tsv'}")
+        print(f"         fix a flagged image manually:  framefit \"<img>\" --pick -o {outdir}")
     return 0 if ok_count else 1
 
 
