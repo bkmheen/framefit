@@ -3,6 +3,18 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.6.2] - 2026-07-13
+
+### Added
+- **Header-aware top trim** (`trim_dark_margins(header_aware=True)`, default on).
+  Some shots leave a dim, non-black gap above the slide (~0.16, a warm/neutral room
+  surround) that the near-black rule can't reach (IMG_3640/3641/3642). Measured
+  discriminator: the gap is "blueness"-negative while the navy header flips strongly
+  positive — so the top is trimmed down to the first colored-header row. Safely
+  gated: bails on bright content, when no colored header is present (other
+  templates), or when the region above isn't dark margin — so it fixes navy-header
+  slides and is inert elsewhere. Never cuts the header (stops at its top edge).
+
 ## [0.6.1] - 2026-07-13
 
 ### Fixed

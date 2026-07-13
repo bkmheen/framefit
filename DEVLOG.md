@@ -2,6 +2,21 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.6.2 — Header-aware top trim (last 3 residual margins)
+
+Only IMG_3640/3641/3642 kept a top margin after 0.6.1. Measured why: their gap
+above the header is dim-but-not-black (~0.16), above the near-black 0.12 rule.
+Profiling top rows of a problem vs a good image showed the clean discriminator is
+**blueness sign**: gap is blue-negative (−13…−17) regardless of being black or
+warm; the navy header is blue-positive (+3…+27). Brightness/saturation don't
+separate (the 3640 gap is warm-saturated).
+
+Implemented `_colored_header_top`: trim the top down to the first blue-positive
+(header) row, gated to bail on bright content / missing header / bright-above so it
+stays inert on non-navy templates and never cuts the header. Considered but not
+adopted as primary: aspect-snap (unreliable single-image — 1.49 sits near 3:2),
+adaptive brightness (gap 0.16 vs header 0.19-0.25 overlap → unsafe). Tests added.
+
 ## 2026-07-13 — v0.6.1 — Fix refine over-crop; reject 180° idea
 
 User found the 0.6.0 trim cut content (IMG_3646 "DYNAMIC OPTICS" logo top) — a

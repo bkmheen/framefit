@@ -51,11 +51,52 @@ def aspect_score(quad: np.ndarray) -> float:
     return aspect_score_wh(w, h)
 
 
+def _colored_header_top(
+    image: np.ndarray,
+    row_m: np.ndarray,
+    hcap: int,
+    blue_min: float = 6.0,
+    bright_stop: float = 0.35,
+    above_cap: float = 0.30,
+) -> int:
+    """Rows to trim off the TOP so the crop starts at a dark *colored* header bar.
+
+    Some shots leave a dark-but-not-black gap above the slide (a dim reddish/neutral
+    room surround, ~0.16 bright) that the near-black rule can't reach. The slide's
+    header, however, is a saturated colour band (a navy title bar here): its
+    "blueness" (B - (R+G)/2) flips strongly positive while the gap stays negative.
+    Trim down to the first such header row.
+
+    Gated for safety — returns 0 (no extra trim) unless a genuine colored header is
+    found above only dark margin: bails if white/bright content appears first, if no
+    blue header band is present (other templates), or if the region above it is too
+    bright to be a margin. So it fixes navy-header slides and is inert elsewhere.
+    """
+    b = image[..., 0].astype(np.float32).mean(axis=1)
+    g = image[..., 1].astype(np.float32).mean(axis=1)
+    r = image[..., 2].astype(np.float32).mean(axis=1)
+    blueness = b - (r + g) / 2.0
+
+    header = -1
+    for i in range(min(hcap, image.shape[0])):
+        if row_m[i] > bright_stop:
+            return 0  # bright content before any colored header -> don't extend
+        if blueness[i] > blue_min:
+            header = i
+            break
+    if header <= 0:
+        return 0
+    if float(np.mean(row_m[:header])) > above_cap:
+        return 0  # region above the header isn't dark margin -> don't extend
+    return header
+
+
 def trim_dark_margins(
     image: np.ndarray,
     dark_ratio: float = 0.12,
     var_max: float = 0.11,
     max_trim: float = 0.30,
+    header_aware: bool = True,
 ) -> tuple[np.ndarray, tuple[int, int, int, int]]:
     """Trim near-black border bands (bezel/room gap) from a rectified image.
 
@@ -65,8 +106,13 @@ def trim_dark_margins(
     slide sits near black (~0.09), while a dark slide header (e.g. a navy title bar,
     ~0.16+) is above it and must be preserved — a higher threshold would eat the
     header. Each edge is trimmed independently, capped at ``max_trim`` of the side
-    length. Returns the cropped image and (top, bottom, left, right) pixels removed.
-    Values are fractions of 255.
+    length.
+
+    When ``header_aware`` is set, the TOP edge is additionally trimmed down to a
+    dark *colored* header bar in cases where the gap above it is dim-but-not-black
+    (see ``_colored_header_top``); this is safely inert when no such header exists.
+    Returns the cropped image and (top, bottom, left, right) pixels removed. Values
+    are fractions of 255.
     """
     g = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
     h, w = g.shape
@@ -85,6 +131,8 @@ def trim_dark_margins(
     b = _scan(row_m[::-1], row_s[::-1], hcap)
     l = _scan(col_m, col_s, wcap)
     r = _scan(col_m[::-1], col_s[::-1], wcap)
+    if header_aware:
+        t = max(t, _colored_header_top(image, row_m, hcap))
     if t + b >= h or l + r >= w:  # safety: never trim everything
         return image, (0, 0, 0, 0)
     return image[t:h - b, l:w - r], (t, b, l, r)

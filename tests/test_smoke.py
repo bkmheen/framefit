@@ -94,3 +94,20 @@ def test_trim_preserves_dim_header_band():
 
     _, (t, _, _, _) = trim_dark_margins(img)
     assert 15 <= t <= 22  # only the near-black margin removed, header kept
+
+
+def test_trim_header_aware_removes_dim_neutral_gap():
+    # dim, non-black, blue-negative (warm) gap above a navy header -> trim the gap,
+    # stop at the navy header (blue-positive). The near-black rule can't reach it.
+    from framefit.geometry import trim_dark_margins
+
+    img = np.empty((300, 400, 3), np.uint8)
+    img[:30, :] = (30, 40, 60)    # BGR warm-dark gap (~0.17, blueness -20)
+    img[30:80, :] = (90, 40, 30)  # navy header (~0.17, blueness +55) -> keep
+    img[80:, :] = (230, 230, 230)  # white content
+    out, (t, _, _, _) = trim_dark_margins(img, header_aware=True)
+    assert 26 <= t <= 32                 # trimmed the warm gap
+    assert out[0, 0, 0] > out[0, 0, 2]   # first kept row is navy (B > R)
+    # with header_aware off, the dim gap survives (near-black rule can't reach it)
+    _, (t0, _, _, _) = trim_dark_margins(img, header_aware=False)
+    assert t0 == 0
