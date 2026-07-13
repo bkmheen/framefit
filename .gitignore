@@ -24,4 +24,5 @@ env/
 /samples/
 /output/
 /research/out/
+/research/out_dl/
 *.HEIC

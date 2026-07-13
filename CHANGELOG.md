@@ -3,6 +3,17 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.2.3] - 2026-07-13
+
+### Added
+- Scenario A experiment: tone preprocessing → C5 (DocAligner).
+  - `preprocess.py`: A1 gamma/shadow lift, A2 CLAHE, A3 screen-emission isolation.
+  - `run_dl_experiment.py`: runs raw/A1/A2/A3 × C5 over the samples, warps from
+    the untouched original, scores detected aspect ratio vs standard slide ratios,
+    emits `research/out_dl/report_dl.html` + `results_dl.csv`.
+- Detection image and output image are separated: preprocessing only feeds corner
+  detection; crop/warp always uses the original.
+
 ## [0.2.2] - 2026-07-13
 
 ### Added

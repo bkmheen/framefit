@@ -2,6 +2,21 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.2.3 — Scenario A: tone preprocessing → C5
+
+User direction: C5 (DL) looked most promising; attack its failure mode by changing
+the tone so the dark header/screen boundary is detectable, get coords from the
+preprocessed image, but crop from the original. Also keep C2's warp engine and the
+idea of feeding C2/C4 results into C5 (scenario B) for later.
+
+Implemented scenario A (chose A1–A3 together):
+- A1 gamma/shadow lift (gamma 0.42) — raise dark tones.
+- A2 CLAHE on L — local contrast at the screen edge.
+- A3 screen-emission isolation — low-threshold lit-region mask (captures the dim
+  navy header, excludes the black room) + contrast stretch → near-silhouette.
+Harness `run_dl_experiment.py` runs raw/A1/A2/A3 × C5, warps from original, and
+scores detected aspect ratio against standard slide ratios (16:9/16:10/4:3/3:2).
+
 ## 2026-07-13 — v0.2.2 — Benchmark results & baseline
 
 Ran all 5 candidates on the 11 HEIC samples (see `research/RESULTS.md`,
