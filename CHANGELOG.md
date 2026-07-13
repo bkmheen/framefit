@@ -3,6 +3,21 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.4.0] - 2026-07-13
+
+### Added
+- **MVP package `src/framefit/`** with a working CLI (`framefit`) and Python API.
+  - `backends/`: `Detector` interface + `ClassicDetector` (permissive core: OpenCV
+    brightness quad + minAreaRect fallback) and `DocAlignerDetector` (`[dl]` extra:
+    A1 gamma-lift → DocAligner corners). `get_backend("auto")` prefers DL when
+    installed, else classic.
+  - `pipeline.py`: load → detect on a preprocessed downscale → warp/crop from the
+    untouched original → optional bezel inset. Returns a `Result` with aspect
+    ratio + score.
+  - `io.py` (HEIC via optional `heic` extra), `preprocess.py`, `geometry.py`,
+    `cli.py`.
+- `framefit` console entry point in pyproject.
+
 ## [0.3.0] - 2026-07-13
 
 ### Added

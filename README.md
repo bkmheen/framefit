@@ -1,6 +1,6 @@
 # framefit
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 Detect a document or presentation slide inside a photo, correct its perspective,
 and crop it to a clean full-frame image.
@@ -11,23 +11,40 @@ distortion, and saves the flattened, full-frame result.
 
 ## Status
 
-Early scaffolding. Benchmarking candidate detection strategies (see `research/`)
-to set a baseline before committing to the final pipeline.
+MVP: a working package + CLI with two detection backends (classical-CV core and an
+optional DocAligner deep-learning backend). See `research/` for the benchmark that
+selected the approach.
 
-## Planned pipeline
+## Usage
 
-1. **Detect** the slide/screen quadrilateral in the image.
-2. **Correct** perspective (dewarp the keystone).
-3. **Crop** to the slide bounds — full frame, edges trimmed.
-4. **Save** the flattened image.
+```bash
+# a single photo, a list, or whole directories
+framefit photo.jpg                       # -> framefit_out/photo_framefit.jpg
+framefit slides/ -o out/ -f png          # batch a folder, PNG output
+framefit talk.heic -b docaligner --inset 0.01   # DL backend, trim a thin bezel
+```
+
+Python API:
+
+```python
+import framefit
+r = framefit.process_file("photo.jpg", "out.jpg", backend="auto")
+print(r.ok, r.aspect_ratio)
+```
+
+Pipeline: **load → detect** (on a tone-preprocessed downscale) **→ perspective-warp
+& crop from the untouched original → optional bezel inset → save**.
 
 ## Repository layout
 
-- `samples/` — local HEIC test photos (gitignored) + `MANIFEST.tsv`.
-- `research/` — candidate detection strategies and the benchmark harness.
-  - `detectors.py` — classical-CV slide-detection candidates.
-  - `run_benchmark.py` — runs every candidate over the samples, writes
-    `research/out/report.html` (gitignored) with side-by-side results.
+- `src/framefit/` — the package.
+  - `pipeline.py` — high-level `process_image` / `process_file`.
+  - `backends/` — `classic.py` (core) and `docaligner.py` (`[dl]` extra) behind a
+    common `Detector` interface (`base.py`); `get_backend("auto"|...)`.
+  - `preprocess.py`, `geometry.py`, `io.py`, `cli.py`.
+- `research/` — the benchmark harness that selected the approach (`RESULTS*.md`,
+  `report*.html`).
+- `samples/` — local test photos (gitignored, third-party; see policy below).
 
 ## Project records
 

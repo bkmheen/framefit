@@ -2,6 +2,19 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.4.0 — MVP package + CLI
+
+Turned the validated research into `src/framefit/`. Backend abstraction realises
+the license separation in code: the permissive `classic` backend (OpenCV only) is
+the default core; the `docaligner` backend lives behind the `[dl]` extra and pairs
+the A1 gamma-lift preprocess with the DL corner model (the benchmark winner). HEIC
+loading sits behind the `[heic]` extra with a helpful error if missing.
+
+Pipeline mirrors the research harness exactly: detect on a 1400px preprocessed
+downscale, map corners back, warp from the untouched original, optional inset for
+the screen bezel. CLI supports files/dirs, backend choice, format, inset. Next:
+install -e and verify on the samples.
+
 ## 2026-07-13 — v0.3.0 — Licensing decided: Apache-2.0 + core/extras split
 
 Investigated licensing for public release. Code licenses of the whole stack are
