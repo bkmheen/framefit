@@ -1,0 +1,30 @@
+framefit
+Copyright 2026 mheens (admin@mheens.com)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+framefit depends on the following software, installed separately via pip (i.e.
+NOT redistributed inside this project). Each is governed by its own license:
+
+  - OpenCV (opencv-python-headless) .......... Apache-2.0
+  - NumPy .................................... BSD-3-Clause
+  - Pillow ................................... MIT-CMU (HPND)
+
+Optional extras (installed only if the user opts in):
+
+  - DocAligner (docaligner-docsaid, capybara-docsaid) ... Apache-2.0 [extra: dl]
+      Note: the pretrained model weights are downloaded at runtime from the
+      DocAligner project and are governed by that project's terms, not by this
+      project. framefit does not redistribute the weights.
+  - pillow-heif .............................. BSD-3-Clause  [extra: heic]
+      Note: pillow-heif binary wheels bundle native codec libraries (libheif
+      LGPLv3, libde265 LGPLv3, x265 GPLv2), which makes the distributed wheel
+      effectively GPLv2, and HEIC/HEVC is a patent-encumbered format. Installing
+      this extra is the user's choice; framefit does not redistribute it.
+
+If framefit is ever repackaged as a single bundle (e.g. a PyInstaller binary or
+container image) that includes any of the above, the corresponding NOTICE /
+license texts of the bundled components must be included in that distribution.

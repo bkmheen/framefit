@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "framefit"
+version = "0.3.0"
+description = "Detect a document or presentation slide in a photo, correct its perspective, and crop it to a clean full-frame image."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "mheens", email = "admin@mheens.com" }]
+keywords = ["document-scanner", "perspective-correction", "dewarp", "slide", "opencv"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+# --- Permissive core: no GPL, no ambiguous DL weights, no HEIC/patent surface. ---
+# Ships the classical-CV slide detectors + the 4-point perspective-warp engine.
+dependencies = [
+    "numpy",
+    "opencv-python-headless",  # Apache-2.0
+    "pillow",                  # MIT-CMU (HPND)
+]
+
+[project.optional-dependencies]
+# Deep-learning corner detector (DocAligner). Apache-2.0 code; model weights are
+# downloaded at runtime under the DocAligner project's terms (not redistributed).
+dl = ["docaligner-docsaid"]
+
+# HEIC/HEIF input support. NOTE: pillow-heif wheels bundle x265 (GPLv2) and HEIC
+# is patent-encumbered — opt in only if you accept those implications.
+heic = ["pillow-heif"]
+
+# Everything (convenience).
+all = ["framefit[dl,heic]"]
+
+[project.urls]
+Homepage = "https://github.com/mheens/framefit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/framefit"]

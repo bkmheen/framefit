@@ -2,6 +2,28 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.3.0 — Licensing decided: Apache-2.0 + core/extras split
+
+Investigated licensing for public release. Code licenses of the whole stack are
+permissive (OpenCV/DocAligner/capybara Apache-2.0, pillow-heif BSD-3, onnxruntime
+MIT, NumPy BSD, Pillow MIT-CMU). Two real risks surfaced:
+1. **DocAligner model weights**: code is Apache-2.0 but the weights' license is
+   unspecified; trained on SmartDoc2015 / MIDV-500·2019·2020 / CORD / self-collected
+   online docs. We never redistribute the weights (runtime download), so the risk
+   stays upstream.
+2. **HEIC**: pillow-heif wheels bundle x265 (GPLv2) → effectively GPLv2, and
+   HEIC/HEVC is patent-encumbered.
+
+Decision: **framefit code = Apache-2.0** (explicit patent grant fits the HEVC
+domain; consistent with our Apache deps; clean contribution terms). Separation of
+"development vs published" implemented the standard way — depend-don't-vendor +
+permissive core with opt-in extras (`[dl]`, `[heic]`). NOTICE burden is ~zero now
+(no vendored third-party source; deps ship no NOTICE files); only relevant if we
+later bundle into a single binary/image. samples/ are third-party copyrighted and
+stay gitignored; public releases need our own/synthetic test images.
+
+Added: LICENSE, NOTICE, pyproject.toml (core + extras), README licensing sections.
+
 ## 2026-07-13 — v0.2.4 — Scenario A result: A1 gamma-lift → C5 wins
 
 Ran raw/A1/A2/A3 × C5 on all 11. **A1 (gamma/shadow lift) is the clear winner**:

@@ -3,6 +3,25 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.3.0] - 2026-07-13
+
+### Added
+- **License: Apache-2.0.** `LICENSE` (canonical text) + `NOTICE` (framefit
+  copyright + third-party breakdown).
+- `pyproject.toml` establishing the license-clean separation:
+  permissive core (numpy / opencv-python-headless / Pillow) + opt-in extras
+  `[dl]` (docaligner-docsaid) and `[heic]` (pillow-heif), plus `[all]`.
+- README: Installation (extras), License, third-party table, and a Test-assets
+  policy (samples/ are third-party copyrighted; never published).
+
+### Notes
+- Licensing findings that drove this: DocAligner code is Apache-2.0 but its model
+  weights are unspecified (downloaded at runtime, not redistributed here);
+  pillow-heif wheels bundle x265 (GPLv2) and HEIC/HEVC is patent-encumbered — both
+  isolated behind opt-in extras so the core stays permissive/patent-clean.
+- Package source (`src/framefit/`) is forthcoming; pyproject declares the intended
+  structure ahead of the implementation.
+
 ## [0.2.4] - 2026-07-13
 
 ### Findings
