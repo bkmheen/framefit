@@ -2,6 +2,24 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.2.2 — Benchmark results & baseline
+
+Ran all 5 candidates on the 11 HEIC samples (see `research/RESULTS.md`,
+`research/out/report.html`). Success (found a quad): C1 11/11, C2 11/11, C3 5/11,
+C4 11/11, C5 11/11. But "found a quad" != correct — visual review is what matters.
+
+**Key finding.** The dark navy template header blends into the dark auditorium, so
+the true top edge is the failure point for every method: C1/C2 clip the header
+(content loss), C4 keeps the full slide but leaves keystone uncorrected + black
+margins, C5 (DL DocAligner) mislocates the top-left corner and produces a sheared
+warp (worst on IMG_3643) at ~231ms/img.
+
+**Baseline / target.** Build on C2's 4-point warp engine but solve the top edge
+explicitly: brightness detection tuned to include the header (adaptive/CLAHE),
+aspect-ratio-based reconstruction of the weak 4th corner, line-refined edges, C4
+full-extent quad as prior, C5 as optional secondary hypothesis scored by
+aspect-ratio + coverage.
+
 ## 2026-07-13 — v0.2.0 — Candidate survey & benchmark harness
 
 **Open-source survey.** Landscape for "photo → detect slide/document → perspective

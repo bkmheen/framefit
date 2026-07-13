@@ -3,6 +3,20 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.2.2] - 2026-07-13
+
+### Added
+- `research/RESULTS.md`: baseline benchmark of all 5 candidates on the 11-sample
+  set (quantitative table + qualitative findings + development target).
+
+### Findings
+- Decisive difficulty = the dark navy header edge blending into the dark room.
+  C1/C2 clip it; C4 keeps full extent but no keystone correction; C5 (DL)
+  mislocates the top-left corner (sheared output) and is ~231ms/img.
+- Development direction: brightness detection tuned to include the header +
+  aspect-ratio-based 4th-corner reconstruction + line-refined keystone warp
+  (C2 engine), with C4 as extent prior and C5 as secondary hypothesis.
+
 ## [0.2.1] - 2026-07-13
 
 ### Fixed
