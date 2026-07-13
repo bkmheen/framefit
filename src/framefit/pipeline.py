@@ -11,7 +11,13 @@ import numpy as np
 
 from . import io
 from .backends import Detector, get_backend
-from .geometry import aspect_ratio, aspect_score, inset_quad, order_corners, warp_from_quad
+from .geometry import (
+    aspect_score_wh,
+    inset_quad,
+    order_corners,
+    trim_dark_margins,
+    warp_from_quad,
+)
 
 
 @dataclass
@@ -31,8 +37,14 @@ def process_image(
     backend: Union[str, Detector] = "auto",
     inset: float = 0.0,
     detect_max: int = 1400,
+    refine: bool = True,
 ) -> Result:
-    """Detect the slide in a BGR image and return the rectified full-frame crop."""
+    """Detect the slide in a BGR image and return the rectified full-frame crop.
+
+    When ``refine`` is set (default), uniformly-dark border bands left by an
+    imprecise edge (typically the top, above a dark header) are trimmed off the
+    rectified image so the slide fills the frame exactly.
+    """
     det = backend if isinstance(backend, Detector) else get_backend(backend)
 
     h, w = image.shape[:2]
@@ -50,7 +62,11 @@ def process_image(
     quad = order_corners(quad_small / scale)
     quad = inset_quad(quad, inset)
     warped = warp_from_quad(image, quad)
-    return Result(True, warped, quad, det.name, aspect_ratio(quad), aspect_score(quad))
+    if refine:
+        warped, _ = trim_dark_margins(warped)
+
+    oh, ow = warped.shape[:2]
+    return Result(True, warped, quad, det.name, ow / oh, aspect_score_wh(ow, oh))
 
 
 def process_file(
@@ -59,11 +75,13 @@ def process_file(
     backend: Union[str, Detector] = "auto",
     inset: float = 0.0,
     detect_max: int = 1400,
+    refine: bool = True,
     quality: int = 95,
 ) -> Result:
     """Load `src`, process it, and write the rectified crop to `dst`."""
     image = io.load_bgr(src)
-    result = process_image(image, backend=backend, inset=inset, detect_max=detect_max)
+    result = process_image(image, backend=backend, inset=inset,
+                           detect_max=detect_max, refine=refine)
     if result.ok and result.image is not None:
         io.save_bgr(result.image, dst, quality=quality)
     return result

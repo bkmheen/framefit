@@ -39,6 +39,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="detection backend (default: auto)")
     p.add_argument("--inset", type=float, default=0.0,
                    help="trim a bezel by moving corners inward, fraction e.g. 0.01")
+    p.add_argument("--no-refine", dest="refine", action="store_false",
+                   help="disable post-warp trimming of dark border margins")
     p.add_argument("-f", "--format", default="jpg",
                    choices=["jpg", "png"], help="output format (default: jpg)")
     p.add_argument("--quality", type=int, default=95, help="JPEG quality (1-100)")
@@ -62,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         dst = outdir / f"{f.stem}_framefit.{args.format}"
         try:
             r = process_file(f, dst, backend=backend, inset=args.inset,
-                             detect_max=args.detect_max, quality=args.quality)
+                             detect_max=args.detect_max, refine=args.refine,
+                             quality=args.quality)
         except Exception as e:  # noqa
             print(f"[error] {f.name}: {e}", file=sys.stderr)
             continue

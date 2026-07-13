@@ -2,6 +2,21 @@
 
 Chronological engineering notes for framefit. Newest entries at top.
 
+## 2026-07-13 — v0.6.0 — Edge refinement (top-margin trim)
+
+User noticed a residual dark band at the top of the outputs. Measured it: ~15%
+dark margin on the TOP edge only (bottom/left/right ~0%) — DocAligner places the
+top edge slightly high (lowest-contrast edge). Compared three fixes on the 11
+outputs: (a) user's re-detection idea — directionally right (AR converged to
+16:10) but failed on 4/11 (slide fills frame → no corners) and only halved the gap
++ double-warp; (b) aspect-snap — partial/inconsistent; (c) projection-profile trim
+— 0% top margin on all 11, content intact, ~1ms, no deps. Picked (c).
+
+Implemented `trim_dark_margins`: per-edge, trims border rows/cols that are both
+dark AND low-variance (so textured content survives), capped per edge. Wired into
+the pipeline as `refine=True` (default), `--no-refine` to disable; reported AR now
+comes from the final image. Tests cover trim + the textured-edge guard.
+
 ## 2026-07-13 — v0.5.0 — Quality pass: auto best-of + tests + gallery
 
 Robustness polish. `AutoDetector` runs the available backends and keeps the more

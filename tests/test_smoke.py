@@ -59,3 +59,26 @@ def test_process_image_classic():
     img, _ = _synthetic_slide()
     r = process_image(img, backend="classic")
     assert r.ok and r.image is not None and r.aspect_score > 0.8
+
+
+def test_trim_dark_margins():
+    from framefit.geometry import trim_dark_margins
+
+    # bright content with a dark uniform band on top only
+    img = np.full((300, 400, 3), 230, np.uint8)
+    img[:60, :, :] = 8  # dark top band
+    out, (t, b, l, r) = trim_dark_margins(img)
+    assert t >= 55 and b == 0 and l == 0 and r == 0
+    assert out.shape[0] < img.shape[0]
+    assert out.mean() > 200  # dark band removed
+
+
+def test_trim_preserves_textured_dark_edge():
+    from framefit.geometry import trim_dark_margins
+
+    # a dark BUT textured top row (content) must NOT be trimmed
+    img = np.full((300, 400, 3), 230, np.uint8)
+    img[:40, :, :] = 8
+    img[:40, ::6, :] = 250  # vertical stripes -> high variance -> content
+    out, (t, _, _, _) = trim_dark_margins(img)
+    assert t == 0  # textured band kept

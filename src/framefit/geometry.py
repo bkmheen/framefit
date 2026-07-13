@@ -36,13 +36,55 @@ def aspect_ratio(quad: np.ndarray) -> float:
     return w / h if h else 0.0
 
 
-def aspect_score(quad: np.ndarray) -> float:
+def aspect_score_wh(w: float, h: float) -> float:
     """1.0 = matches a standard slide ratio; decreases with deviation."""
-    ar = aspect_ratio(quad)
-    if ar <= 0:
+    if h <= 0 or w <= 0:
         return 0.0
+    ar = w / h
     best = min(abs(ar - s) / s for s in STD_ASPECT_RATIOS)
     return max(0.0, 1.0 - best)
+
+
+def aspect_score(quad: np.ndarray) -> float:
+    """1.0 = matches a standard slide ratio; decreases with deviation."""
+    w, h = quad_size(quad)
+    return aspect_score_wh(w, h)
+
+
+def trim_dark_margins(
+    image: np.ndarray,
+    dark_ratio: float = 0.40,
+    var_max: float = 0.11,
+    max_trim: float = 0.30,
+) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+    """Trim uniformly-dark border bands (bezel/gap) from a rectified image.
+
+    A border row/column is trimmed only while it is both dark (mean below
+    ``dark_ratio``) and near-uniform (std below ``var_max``), so textured content
+    is never cut. Each edge is trimmed independently, capped at ``max_trim`` of the
+    side length. Returns the cropped image and the (top, bottom, left, right) pixels
+    removed. Values are fractions of 255.
+    """
+    g = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+    h, w = g.shape
+    dark, var = float(dark_ratio), float(var_max)
+
+    def _scan(mean_prof: np.ndarray, std_prof: np.ndarray, limit: int) -> int:
+        c = 0
+        while c < limit and mean_prof[c] < dark and std_prof[c] < var:
+            c += 1
+        return c
+
+    row_m, row_s = g.mean(1), g.std(1)
+    col_m, col_s = g.mean(0), g.std(0)
+    hcap, wcap = int(h * max_trim), int(w * max_trim)
+    t = _scan(row_m, row_s, hcap)
+    b = _scan(row_m[::-1], row_s[::-1], hcap)
+    l = _scan(col_m, col_s, wcap)
+    r = _scan(col_m[::-1], col_s[::-1], wcap)
+    if t + b >= h or l + r >= w:  # safety: never trim everything
+        return image, (0, 0, 0, 0)
+    return image[t:h - b, l:w - r], (t, b, l, r)
 
 
 def inset_quad(quad: np.ndarray, frac: float) -> np.ndarray:

@@ -3,6 +3,19 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.6.0] - 2026-07-13
+
+### Added
+- **Edge refinement** (`geometry.trim_dark_margins`): after warping, uniformly-dark
+  border bands left by an imprecise edge (typically the top, above a dark header)
+  are trimmed so the slide fills the frame. Guarded by a variance test (textured
+  content is never cut) and a per-edge trim cap. On by default in `process_image` /
+  `process_file`; `--no-refine` disables it.
+- Chosen over the alternatives after measuring on the samples: re-detection closed
+  only ~half the gap and failed on 4/11; aspect-snap was partial; trim reached 0%
+  top margin on all 11 with content intact. Reported aspect ratio now reflects the
+  final (trimmed) image.
+
 ## [0.5.0] - 2026-07-13
 
 ### Added
