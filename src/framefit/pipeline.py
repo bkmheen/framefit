@@ -31,6 +31,7 @@ class Result:
     aspect_ratio: float = 0.0
     aspect_score: float = 0.0
     low_confidence: bool = False       # DL detector fell back to the classical core
+    detect_score: Optional[float] = None  # classical composite score (calibration signal)
 
 
 def process_image(
@@ -76,9 +77,10 @@ def process_image(
     src = getattr(det, "last_source", None)          # AutoDetector reports its sub
     backend_name = src or det.name
     low_conf = det.name == "auto" and src != "docaligner"  # DL fell back → low conf
+    detect_score = getattr(det, "last_score", None)
     oh, ow = warped.shape[:2]
     return Result(True, warped, quad, backend_name, ow / oh,
-                  aspect_score_wh(ow, oh), low_conf)
+                  aspect_score_wh(ow, oh), low_conf, detect_score)
 
 
 def process_manual(

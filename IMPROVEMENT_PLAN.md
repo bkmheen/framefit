@@ -146,6 +146,17 @@ Cross-tabulate `delta_norm` (truth) against `low_confidence` + `aspect_score` to
 quad-vs-image-border distance, interior/exterior contrast) to replace the hard
 threshold — a genuinely *learned* suspect flag.
 
+**Progress (2026-07-14):** the composite detector score (`score_quad` of the winning
+candidate) is a real confidence signal — on the review log it correlates with
+accuracy **|r|≈0.65** (corr with IoU +0.63, with delta_norm −0.67), *better than
+`aspect_score`* (which barely varies, 0.90–0.99, for both good and bad crops). But
+n=11 has **no clean threshold** (a bad shot at 0.793 outscores a good one at 0.798),
+so the flag logic is **left unchanged** (no overfit). Instead the signal is now
+plumbed and **logged as `auto_detect_score`** (schema v2) on every decision:
+`ClassicDetector.last_score → AutoDetector.last_score → Result.detect_score →
+build_record`. Fit the threshold / logistic model once the log reaches ≥~100 pairs
+across rooms.
+
 ### Phase 4 — Regression gate + loop
 Wire Phase 1 into a `pytest` marker (`test_detector_no_regression`) that fails if
 mean IoU on the log drops. Each new correction enriches the log → re-run → keep the
@@ -171,5 +182,6 @@ best. Record deltas in CHANGELOG; keep this file's Evidence table current.
 - [x] Phase 2 — multi-hypothesis detector + composite scorer in `classic.py`;
   auto-path mean IoU 0.808 → 0.868, worst shot 0.239 → 0.894, zero regressions,
   existing tests pass. (Confidence-aware `expand` 2.4 still open.)
-- [ ] Phase 3 — calibration.
+- [~] Phase 3 — calibration signal validated (|r|≈0.65) and logged as
+  `auto_detect_score` (schema v2); threshold/model deferred until the log grows.
 - [ ] Phase 4 — regression gate (pytest on the eval harness).

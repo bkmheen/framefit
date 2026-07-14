@@ -103,7 +103,9 @@ Macs) and the original + crop are copied content-addressed by SHA-1:
 ```
 
 Key record fields: `source_sha1` (identity), `backend`, `auto_low_confidence`,
-`auto_aspect_score`, `auto_quad`, `final_quad`, `action`
+`auto_aspect_score`, `auto_detect_score` (classical composite confidence — a
+calibration signal, |r|≈0.65 with accuracy; schema v2), `auto_quad`, `final_quad`,
+`action`
 (`accept|modify|skip|manual_from_scratch`), `was_modified`, and the calibration
 signal **`delta_norm` = max corner move / image diagonal** (how far the human moved
 the auto corners, resolution-independent). Cross-tabulate `delta_norm` against the

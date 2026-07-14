@@ -36,7 +36,7 @@ import numpy as np
 from . import __version__, io
 from .geometry import aspect_score_wh, order_corners
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # v2: added auto_detect_score (classical composite calibration signal)
 
 # Longest side (px) for the stored original copy — bounds synced-folder growth
 # while keeping enough resolution to re-inspect a bad crop. Override with env.
@@ -141,6 +141,7 @@ def build_record(
     final_quad,                # full-res px or None (None only when skipped)
     action: str,               # accept | modify | skip | manual_from_scratch
     display_scale: float,
+    auto_detect_score: Optional[float] = None,  # classical composite score (calibration)
     output_path: Optional[str | Path],
     output_aspect_ratio: float = 0.0,
     output_aspect_score: float = 0.0,
@@ -178,6 +179,8 @@ def build_record(
         "backend": backend,
         "auto_low_confidence": bool(auto_low_confidence),
         "auto_aspect_score": round(float(auto_aspect_score), 4),
+        "auto_detect_score": (None if auto_detect_score is None
+                              else round(float(auto_detect_score), 4)),
         "auto_quad": _quad_list(auto_ordered),
         "final_quad": _quad_list(final_ordered),
         "action": action,

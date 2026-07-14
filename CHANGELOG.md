@@ -18,6 +18,12 @@ Versioning: `major.minor.patch` (initial major = 0).
   previously-correct shots. See `IMPROVEMENT_PLAN.md`.
 
 ### Added
+- **Detection confidence signal (`auto_detect_score`, schema v2).** The winning
+  candidate's composite `score_quad` is now surfaced on `Result.detect_score` and
+  logged with every review decision. On the review log it correlates with accuracy
+  (|r|≈0.65) — a better calibration signal than `aspect_score`. The review flag is
+  deliberately *not* re-thresholded yet (n too small); the signal is accumulated
+  for a learned threshold once the dataset grows (Phase 3 of `IMPROVEMENT_PLAN.md`).
 - **Offline eval harness** `research/eval_against_log.py` — scores any detector
   against the human `final_quad` labels via the production `process_image` path
   (IoU / delta_norm / top-edge error); works from the SHA-1 dataset copies even

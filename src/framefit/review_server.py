@@ -142,6 +142,7 @@ class ReviewState:
                     "backend": backend_name,
                     "low_confidence": low_conf,
                     "aspect_score": aspect,
+                    "detect_score": res.detect_score if res.ok else None,
                     "verdict": verdict,
                 }
                 # --only-flagged: silently auto-accept confident detections so the
@@ -203,6 +204,7 @@ class ReviewState:
                 backend=prep["backend"],
                 auto_low_confidence=prep["low_confidence"],
                 auto_aspect_score=prep["aspect_score"],
+                auto_detect_score=prep.get("detect_score"),
                 auto_quad=auto_full, display_scale=prep["scale"],
             )
 
@@ -253,7 +255,8 @@ class ReviewState:
             source_path=prep["path"], source_sha1=prep["sha1"],
             image_width=prep["width"], image_height=prep["height"],
             backend=prep["backend"], auto_low_confidence=prep["low_confidence"],
-            auto_aspect_score=prep["aspect_score"], auto_quad=prep["auto_full"],
+            auto_aspect_score=prep["aspect_score"],
+            auto_detect_score=prep.get("detect_score"), auto_quad=prep["auto_full"],
             display_scale=prep["scale"],
             final_quad=[[float(x), float(y)] for x, y in full],
             action=action_kind, output_path=str(dst),

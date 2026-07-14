@@ -150,6 +150,12 @@ class ClassicDetector(Detector):
     name = "classic"
     license_note = "OpenCV (Apache-2.0) + NumPy (BSD). No GPL, no model weights."
 
+    #: composite score of the most recent winning candidate (0..~1). A calibration
+    #: signal: it correlates with accuracy (|r|≈0.65 on the review log) better than
+    #: aspect_score does. Recorded per decision so a reliable review-flag threshold
+    #: can be fit once the dataset grows. None when the last-resort box fired.
+    last_score: Optional[float] = None
+
     def detect(self, bgr: np.ndarray) -> Optional[np.ndarray]:
         h, w = bgr.shape[:2]
         area = h * w
@@ -174,9 +180,13 @@ class ClassicDetector(Detector):
             gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
             gradmag = cv2.magnitude(gx, gy)
             g90 = float(np.percentile(gradmag, 90))
-            return max(candidates, key=lambda q: score_quad(q, gray, gradmag, g90))
+            scored = [(score_quad(q, gray, gradmag, g90), q) for q in candidates]
+            best_score, best_quad = max(scored, key=lambda z: z[0])
+            self.last_score = float(best_score)
+            return best_quad
 
         # last-resort fallback: rotated bounding box of the largest bright blob
+        self.last_score = None
         gray = cv2.GaussianBlur(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY), (7, 7), 0)
         _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
