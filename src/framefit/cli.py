@@ -13,13 +13,32 @@ IMG_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff",
                 ".webp", ".heic", ".heif", ".hif"}
 
 
-def _expand_inputs(paths: list[str]) -> list[Path]:
+def _expand_inputs(paths: list[str], exts: str | None = None,
+                   recurse: bool = False, under: str | None = None) -> list[Path]:
+    """Expand directory inputs to image files. ``exts`` (comma-separated, e.g.
+    "heic" or "heic,jpg") restricts a directory scan to those extensions; when
+    omitted every known image type is included. ``recurse`` walks every
+    subdirectory. ``under`` keeps only files that live under a directory with
+    that name (e.g. ``under="source"`` selects every HEIC below any ``source/``
+    folder, ignoring images that sit elsewhere). Explicit file paths are kept
+    as-is regardless of ``exts``/``under``."""
+    allow = None
+    if exts:
+        allow = {"." + e.strip().lower().lstrip(".")
+                 for e in exts.split(",") if e.strip()}
     out: list[Path] = []
     for p in paths:
         path = Path(p)
         if path.is_dir():
-            out += sorted(f for f in path.iterdir()
-                          if f.suffix.lower() in IMG_SUFFIXES)
+            sel = allow or IMG_SUFFIXES
+            it = path.rglob("*") if recurse else path.iterdir()
+            for f in it:
+                if not f.is_file() or f.suffix.lower() not in sel:
+                    continue
+                if under is not None and under not in f.parts:
+                    continue
+                out.append(f)
+            out.sort()
         else:
             out.append(path)
     return out
@@ -53,6 +72,35 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pick", action="store_true",
                    help="don't process — write an HTML corner-picker per input to "
                         "the output dir (use for images flagged for review)")
+    p.add_argument("--review", action="store_true",
+                   help="interactive review: open a local browser page to confirm "
+                        "or edit the auto-detected corners per image, then crop. "
+                        "Logs every decision to the shared learning dataset.")
+    p.add_argument("--display-max", type=int, default=1400,
+                   help="longest side shown in the review page (default: 1400)")
+    p.add_argument("--beside", action="store_true",
+                   help="write each result next to its source with the SAME name "
+                        "and a .jpg extension (e.g. src/IMG.HEIC -> src/IMG.jpg), "
+                        "ignoring -o/--output")
+    p.add_argument("--force", action="store_true",
+                   help="overwrite an existing output file (otherwise it is skipped)")
+    p.add_argument("--ext", default=None,
+                   help="when an input is a directory, only process files with "
+                        "this extension (comma-separated ok, e.g. --ext heic or "
+                        "--ext heic,jpg). Default: every known image type.")
+    p.add_argument("--only-flagged", action="store_true",
+                   help="review mode: only stop on low-confidence/flagged images; "
+                        "confident detections are auto-accepted and cropped without "
+                        "prompting")
+    p.add_argument("--recurse", action="store_true",
+                   help="recurse into subdirectories when an input is a directory "
+                        "(e.g. process every HEIC under any source/ folder)")
+    p.add_argument("--under", default=None, metavar="DIRNAME",
+                   help="with --recurse, only include files that live under a "
+                        "directory named DIRNAME (e.g. --under source)")
+    p.add_argument("--skip-decided", action="store_true",
+                   help="skip images already decided in the review log — protects "
+                        "hand-corrected crops from being overwritten on a re-run")
     p.add_argument("-f", "--format", default="jpg",
                    choices=["jpg", "png"], help="output format (default: jpg)")
     p.add_argument("--quality", type=int, default=95, help="JPEG quality (1-100)")
@@ -69,9 +117,19 @@ def _parse_corners(s: str):
     return pts
 
 
+def _dst_for(src: Path, outdir: Path, beside: bool, fmt: str) -> Path:
+    """Where the crop for ``src`` is written. ``--beside`` puts it next to the
+    source with the same stem and a .jpg extension; otherwise under ``outdir`` as
+    ``<stem>_framefit.<fmt>``."""
+    if beside:
+        return src.parent / f"{src.stem}.jpg"
+    return outdir / f"{src.stem}_framefit.{fmt}"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    files = _expand_inputs(args.inputs)
+    files = _expand_inputs(args.inputs, args.ext, recurse=args.recurse,
+                           under=args.under)
     if not files:
         print("framefit: no input images found", file=sys.stderr)
         return 2
@@ -87,6 +145,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nOpen the *_pick.html file(s), click 4 corners, run the printed command.")
         return 0
 
+    # --review: interactive browser review loop (A propose → B edit → C crop + log)
+    if args.review:
+        from .review_server import run_review
+        run_review(files, outdir, backend=args.backend,
+                   display_max=args.display_max,
+                   review_threshold=args.review_threshold,
+                   out_format=args.format, quality=args.quality,
+                   beside=args.beside, force=args.force,
+                   only_flagged=args.only_flagged)
+        return 0
+
     # --corners: manual single-image mode
     if args.corners is not None:
         if len(files) != 1:
@@ -95,26 +164,44 @@ def main(argv: list[str] | None = None) -> int:
         from . import io
         from .pipeline import process_manual
         f = files[0]
+        dst = _dst_for(f, outdir, args.beside, args.format)
+        if dst.exists() and not args.force:
+            print(f"framefit: {dst} exists — use --force to overwrite", file=sys.stderr)
+            return 2
         image = io.load_bgr(f)
         r = process_manual(image, _parse_corners(args.corners), refine=args.refine)
-        dst = outdir / f"{f.stem}_framefit.{args.format}"
+        dst.parent.mkdir(parents=True, exist_ok=True)
         io.save_bgr(r.image, dst, quality=args.quality)
         print(f"[manual] {f.name} -> {dst}  (AR {r.aspect_ratio:.2f})")
         return 0
 
     backend = get_backend(args.backend)  # instantiate once (loads model if any)
+    decided = set()
+    if args.skip_decided:
+        from . import feedback
+        decided = feedback.decided_hashes()
     ok_count = 0
     rows = []  # (source, output, ok, ar, score, review)
     for f in files:
-        out_name = f"{f.stem}_framefit.{args.format}"
-        dst = outdir / out_name
+        if decided:
+            from . import feedback
+            if feedback.sha1_of_file(f) in decided:
+                print(f"[reviewed] {f.name}: already hand-decided — skipped")
+                rows.append((str(f), "", 0, 0.0, 0.0, "-", "REVIEWED"))
+                continue
+        dst = _dst_for(f, outdir, args.beside, args.format)
+        out_name = dst.name
+        if dst.exists() and not args.force:
+            print(f"[skip] {f.name}: {dst.name} exists (use --force)", file=sys.stderr)
+            rows.append((str(f), out_name, 0, 0.0, 0.0, "-", "SKIP"))
+            continue
         try:
             r = process_file(f, dst, backend=backend, inset=args.inset,
                              expand=args.expand, detect_max=args.detect_max,
                              refine=args.refine, quality=args.quality)
         except Exception as e:  # noqa
             print(f"[error] {f.name}: {e}", file=sys.stderr)
-            rows.append((str(f), "", 0, 0.0, 0.0, "ERROR"))
+            rows.append((str(f), "", 0, 0.0, 0.0, "-", "ERROR"))
             continue
         if r.ok:
             ok_count += 1

@@ -34,6 +34,19 @@ framefit tricky.heic --pick -o out/      # writes out/tricky_pick.html
 framefit tricky.heic --corners "x1,y1 x2,y2 x3,y3 x4,y4" -o out/
 ```
 
+### Semi-automatic review + learning dataset
+
+A browser-based loop shows the auto-detected 4 corners with a confidence badge,
+lets you drag to fix them, crops, and logs every decision (accept vs. edit) as
+learning data. Batch/agent recipes (`--recurse --under source`, `--beside`,
+`--skip-decided`, …) and the agent/human boundary are documented in
+**[`AGENTS.md`](AGENTS.md)** — the maintained usage guide for driving this module
+(from another agent or by hand).
+
+```bash
+framefit "slides/" --review --only-flagged --beside --force   # human: fix flagged only
+```
+
 Python API:
 
 ```python

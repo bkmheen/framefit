@@ -10,6 +10,8 @@ venv/
 env/
 
 # Tooling / caches
+.omc/
+.claude/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
