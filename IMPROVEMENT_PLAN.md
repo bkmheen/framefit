@@ -101,16 +101,34 @@ Worst 6 are all `modify`, and `top_dnorm` is the majority of each error (e.g. 36
 dNorm 0.098, topDN 0.079). This is the number every change below must beat.
 
 ### Phase 2 — Detector fixes, ranked by the evidence (top edge first)
-1. **Screen-frame detector (new hypothesis).** Detect the projection screen by its
-   **dark rectangular bezel**, not by interior brightness: adaptive/edge path
-   (`Canny → dilate → largest convex quad`) plus morphological **hole-filling** so
-   an internally-dark title band never splits the region. Add as a sibling of
-   `ClassicDetector`.
-2. **Multi-hypothesis + honest scoring in `auto.py`.** Generate several candidates
-   (Otsu-bright, edge-screen, dark-frame), and score by more than aspect: reward
-   quads whose **border lies on a strong straight gradient** and whose **interior
-   is more uniform than the immediate exterior** (slide vs wall). Pick the best;
-   this is what separates "right rectangle" from "bright blob."
+1. **Screen-frame detector (new hypothesis).** ✅ **Done (2026-07-14).** `classic.py`
+   now generates candidates from four cues — bright-Otsu, hole-filled Otsu (large
+   close swallows a dark title band), **Canny screen boundary** (brightness-
+   independent), and HSV-value — instead of a single threshold.
+2. **Multi-hypothesis + honest scoring.** ✅ **Done.** `classic.score_quad` picks the
+   candidate by a composite: **edge support** (border on strong gradient) +
+   **interior/surround contrast** + **exterior quiet** (a quad cutting across the
+   slide has content — texture — just outside it → penalized) + aspect + area −
+   border-touch. This is what separates "right rectangle" from "bright interior
+   blob." Weights tuned on the log; probe of a wider generator set + oracle
+   (0.928) documented the ceiling.
+
+   **Result (harness, auto path, `a/` n=11):**
+
+   | metric | baseline | now | 
+   |--------|---------:|----:|
+   | mean IoU | 0.808 | **0.868** |
+   | median IoU | 0.845 | 0.894 |
+   | cut (>0.05) | 54% | **46%** |
+   | IMG_3673 (worst) | 0.239 | **0.894** |
+
+   Zero regressions on the previously-correct shots; the remaining low-IoU shots
+   (3682/3674/3676…) are all low-confidence and correctly flagged for review. A
+   blanket-CLAHE style global swap was rejected (see 2.3). Existing tests pass.
+
+   *Rejected in probe:* raw "largest candidate" and single-method swaps — no method
+   dominates (per-image oracle needs all four); over-tuning the scorer to also nail
+   3674/3682 risked overfitting 8 samples, deferred until the log grows.
 3. **CLAHE-before-detect for tinted shots.** ~~`preprocess.clahe` already exists;
    run detection on the local-contrast image…~~ **REJECTED by probe (2026-07-14).**
    Measured blanket CLAHE / gamma before the classic detector on the `a/` set:
@@ -150,6 +168,8 @@ best. Record deltas in CHANGELOG; keep this file's Evidence table current.
 - [x] Phase 0 — logging live; 11 labeled pairs.
 - [x] Phase 1 — eval harness (`research/eval_against_log.py`), faithful to
   production; baseline mean IoU 0.808 / cut 54% recorded above.
-- [ ] Phase 2 — detector fixes (next: CLAHE-before-detect probe, then screen-frame detector).
+- [x] Phase 2 — multi-hypothesis detector + composite scorer in `classic.py`;
+  auto-path mean IoU 0.808 → 0.868, worst shot 0.239 → 0.894, zero regressions,
+  existing tests pass. (Confidence-aware `expand` 2.4 still open.)
 - [ ] Phase 3 — calibration.
-- [ ] Phase 4 — regression gate.
+- [ ] Phase 4 — regression gate (pytest on the eval harness).

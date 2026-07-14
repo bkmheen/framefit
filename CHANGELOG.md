@@ -3,6 +3,28 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [0.9.0] - 2026-07-14
+
+### Changed
+- **Multi-hypothesis classical detector.** `backends/classic.py` no longer trusts a
+  single global-Otsu bright blob. It now proposes candidate quads from four cues
+  (bright-Otsu, hole-filled Otsu, Canny screen boundary, HSV-value) and picks the
+  best with a composite `score_quad` — edge support, interior/surround contrast,
+  exterior-quiet (penalizes a quad that cuts *across* the slide), aspect, area,
+  border-touch penalty. Fixes the dominant color-cast failure where the detector
+  grabbed the bright inner image and cut the title (or swallowed ceiling lights).
+  Measured on the review log (auto path, n=11): mean IoU 0.808 → **0.868**, worst
+  shot 0.239 → **0.894**, cut-rate 54% → 46%, with zero regressions on the
+  previously-correct shots. See `IMPROVEMENT_PLAN.md`.
+
+### Added
+- **Offline eval harness** `research/eval_against_log.py` — scores any detector
+  against the human `final_quad` labels via the production `process_image` path
+  (IoU / delta_norm / top-edge error); works from the SHA-1 dataset copies even
+  after source photos are deleted. The gate for every future detector change.
+- **`IMPROVEMENT_PLAN.md`** — data-driven, staged detection-improvement plan
+  (evidence → harness → detector fixes → calibration → regression gate).
+
 ## [0.8.0] - 2026-07-13
 
 ### Added

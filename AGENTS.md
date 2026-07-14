@@ -7,7 +7,7 @@ as learning data.
 
 > This file is **kept up to date** as the module evolves. When you add/rename a
 > flag, change a path, or validate a new recipe, update the matching section and
-> the **Maintenance** log at the bottom. Last validated: **2026-07-14, v0.8.0**.
+> the **Maintenance** log at the bottom. Last validated: **2026-07-14, v0.9.0**.
 
 ---
 
@@ -142,6 +142,10 @@ Keep this file in sync with the code. Update when any of the below change.
 - **Headless regen**: `src/framefit/batch_replay.py`.
 
 ### Change log (agent-facing)
+- **2026-07-14 (v0.9.0)** — Multi-hypothesis classical detector (4 candidate cues +
+  composite `score_quad`) replaces single-Otsu; fixes color-cast title-cut/ceiling
+  grabs. Added `research/eval_against_log.py` (scores detectors vs the human review
+  log) and `IMPROVEMENT_PLAN.md`. Auto-path mean IoU 0.808→0.868 on the review set.
 - **2026-07-14 (v0.8.0)** — Added the review/crop module: `feedback.py`,
   `review_server.py`, `batch_replay.py`; new CLI flags `--review`, `--only-flagged`,
   `--beside`, `--force`, `--ext`, `--recurse`, `--under`, `--skip-decided`,
