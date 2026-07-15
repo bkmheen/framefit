@@ -160,12 +160,22 @@ class ReviewState:
                         and auto_full is not None
                         and self.idx == self.frontier
                         and self.idx not in self.session_actions):
+                    idx0 = self.idx
                     full = order_corners(np.asarray(auto_full, dtype=np.float32))
-                    res = self._write_crop_and_log(prep, full, "accept",
-                                                   allow_overwrite=self.force)
+                    # presented=False / was_auto_accepted=True: the human was never
+                    # asked. If they later step back into this image and change it,
+                    # that revision is the "under_flag" signal.
+                    res = self._write_crop_and_log(
+                        prep, full, "accept", allow_overwrite=self.force,
+                        meta=self._decision_meta(prep, presented=False,
+                                                 was_auto_accepted=True,
+                                                 revised=False, idx0=idx0))
                     if res.get("ok"):
-                        self.auto_accepted += 1
-                    self.idx += 1               # advance regardless — never loop
+                        # register in the session history so '◀ 이전' can reach and
+                        # correct a wrongly auto-accepted image
+                        self.saved_full[idx0] = [[float(x), float(y)] for x, y in full]
+                        self._record_action(idx0, "auto")
+                    self.idx = idx0 + 1          # advance regardless — never loop
                     self._advance_to_undecided()
                     self.frontier = self.idx
                     continue
@@ -233,6 +243,10 @@ class ReviewState:
             revisit = idx0 < self.frontier
             inv = prep["inv"]
             auto_full = prep["auto_full"]
+            # classification context — captured BEFORE _record_action overwrites the
+            # prior action, so a revision of an auto-accept is recorded as such.
+            meta = self._decision_meta(prep, presented=True, was_auto_accepted=False,
+                                       revised=revisit, idx0=idx0)
 
             if action == "skip":
                 orig_rel, _ = feedback.store_dataset(prep["sha1"], prep["bgr"], None)
@@ -245,7 +259,8 @@ class ReviewState:
                     auto_detect_score=prep.get("detect_score"),
                     auto_quad=auto_full, display_scale=prep["scale"],
                     final_quad=None, action="skip",
-                    output_path=None, dataset_original=orig_rel, dataset_crop=None)
+                    output_path=None, dataset_original=orig_rel, dataset_crop=None,
+                    **meta)
                 feedback.append_record(rec)
                 self.decided.add(prep["sha1"])
                 self.saved_full[idx0] = None
@@ -271,13 +286,26 @@ class ReviewState:
             # A revisit save always overwrites the crop it wrote earlier this
             # session, regardless of --force.
             res = self._write_crop_and_log(prep, full, action_kind,
-                                           allow_overwrite=(revisit or self.force))
+                                           allow_overwrite=(revisit or self.force),
+                                           meta=meta)
             if not res.get("ok"):
                 return res
             self.saved_full[idx0] = [[float(x), float(y)] for x, y in full]
             self._record_action(idx0, "save")
             self._navigate_after(idx0, revisit)
             return res
+
+    def _decision_meta(self, prep, *, presented, was_auto_accepted, revised, idx0):
+        """The review-signal context for one decision, read from the current prep +
+        the prior session action for ``idx0`` (call BEFORE overwriting it)."""
+        prior = self.session_actions.get(idx0)
+        v = prep["verdict"]
+        return dict(
+            verdict_level=v["level"], verdict_reason=v.get("reason", ""),
+            presented=presented, was_auto_accepted=was_auto_accepted,
+            revised=revised, prior_action=prior,
+            prior_was_auto_accepted=(prior == "auto"),
+        )
 
     # -- decision bookkeeping / navigation -------------------------------- #
     def _record_action(self, idx, kind):
@@ -286,8 +314,12 @@ class ReviewState:
         self.session_actions[idx] = kind
         if idx not in self.session_decided:
             self.session_decided.append(idx)
-        self.done_count = sum(1 for v in self.session_actions.values() if v == "save")
-        self.skipped_count = sum(1 for v in self.session_actions.values() if v == "skip")
+        vals = self.session_actions.values()
+        self.done_count = sum(1 for v in vals if v == "save")
+        self.skipped_count = sum(1 for v in vals if v == "skip")
+        # recomputed (not incremented) so correcting an auto-accept via '◀ 이전'
+        # moves it out of the auto tally into the save tally
+        self.auto_accepted = sum(1 for v in vals if v == "auto")
 
     def _navigate_after(self, idx0, revisit):
         """After a save/skip: a revisit hops back to the live frontier; a normal
@@ -310,10 +342,12 @@ class ReviewState:
         self._prepared = None
         return {"ok": True, "action": "back", "index": prev}
 
-    def _write_crop_and_log(self, prep, full, action_kind, allow_overwrite) -> dict:
+    def _write_crop_and_log(self, prep, full, action_kind, allow_overwrite,
+                            meta=None) -> dict:
         """Warp → save (beside/force-aware) → store dataset → log. Does NOT touch
         counters or the queue position — callers own navigation. Shared by the
-        interactive save path and the ``--only-flagged`` auto-accept."""
+        interactive save path and the ``--only-flagged`` auto-accept. ``meta`` carries
+        the review-signal context (verdict/presented/auto/revised)."""
         src = prep["path"]
         dst = (src.parent / f"{src.stem}.jpg" if self.beside
                else self.outdir / f"{src.stem}_framefit.{self.out_format}")
@@ -334,7 +368,8 @@ class ReviewState:
             final_quad=[[float(x), float(y)] for x, y in full],
             action=action_kind, output_path=str(dst),
             output_aspect_ratio=r.aspect_ratio, output_aspect_score=r.aspect_score,
-            dataset_original=orig_rel, dataset_crop=crop_rel)
+            dataset_original=orig_rel, dataset_crop=crop_rel,
+            **(meta or {}))
         feedback.append_record(rec)
         self.decided.add(prep["sha1"])
         return {"ok": True, "action": action_kind, "output": str(dst),

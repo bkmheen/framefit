@@ -36,7 +36,48 @@ import numpy as np
 from . import __version__, io
 from .geometry import aspect_score_wh, order_corners
 
-SCHEMA_VERSION = 2  # v2: added auto_detect_score (classical composite calibration signal)
+SCHEMA_VERSION = 3  # v3: review-signal labels — distinguish over-flag vs under-flag
+                    #     (see review_signals()); v2 added auto_detect_score.
+
+# The review-signal vocabulary. These labels are the training target for a future
+# "does this detection actually need human review?" classifier. Two of them are the
+# detector's *mistakes* and the whole point of collecting this dataset:
+#   under_flag — the system was confident (auto-accepted, or shown as "good") yet the
+#                human had to change the crop. It SHOULD have asked. (사용자가 물어보지
+#                않은 것을 다시 수정)  ← false negative of the review gate.
+#   over_flag  — the system asked for review (flagged suspect/fail) but the human made
+#                no change. It should NOT have asked. (확인 필요라 했는데 그냥 넘어감)
+#                ← false positive of the review gate.
+# The rest are correct outcomes or non-signal:
+#   correct_flag   — flagged and the human did change it (review was warranted).
+#   confirmed_pass — shown as good and left unchanged (confident and correct).
+#   auto_pass      — auto-accepted and never revised (confident and correct).
+#   skip           — discarded; carries no flag-accuracy signal.
+REVIEW_SIGNALS = ("under_flag", "over_flag", "correct_flag",
+                  "confirmed_pass", "auto_pass", "skip")
+
+
+def classify_review_signal(*, action: str, was_flagged: bool, was_modified: bool,
+                           was_auto_accepted: bool, revised: bool,
+                           prior_was_auto_accepted: bool) -> str:
+    """Single source of truth mapping one decision's atomic facts to a
+    :data:`REVIEW_SIGNALS` label. Used both when a record is written and by
+    :func:`review_signals` at analysis time, so the two never drift."""
+    if action == "skip":
+        return "skip"
+    # Signal A (false negative): confident but the crop actually needed changing —
+    # either an auto-accept the human came back to fix, or a "good" the human still
+    # edited.
+    if (revised and prior_was_auto_accepted) or (not was_flagged and was_modified):
+        return "under_flag"
+    if was_flagged and was_modified:
+        return "correct_flag"
+    # Signal B (false positive): flagged for review but the human changed nothing.
+    if was_flagged and not was_modified:
+        return "over_flag"
+    if was_auto_accepted:
+        return "auto_pass"
+    return "confirmed_pass"
 
 # Longest side (px) for the stored original copy — bounds synced-folder growth
 # while keeping enough resolution to re-inspect a bad crop. Override with env.
@@ -147,8 +188,18 @@ def build_record(
     output_aspect_score: float = 0.0,
     dataset_original: Optional[str] = None,
     dataset_crop: Optional[str] = None,
+    # -- review-signal context (v3) -------------------------------------- #
+    verdict_level: str = "good",        # good | suspect | fail (self-assessment)
+    verdict_reason: str = "",           # why the verdict was reached
+    presented: bool = True,             # was the image actually shown to the human?
+    was_auto_accepted: bool = False,    # silently cropped (--only-flagged good)
+    revised: bool = False,              # this decision overrides an earlier one
+    prior_action: Optional[str] = None,        # the action being overridden
+    prior_was_auto_accepted: bool = False,     # ...and was it an auto-accept?
 ) -> dict:
-    """Assemble one decision record, computing the calibration-relevant deltas."""
+    """Assemble one decision record, computing the calibration-relevant deltas and
+    the :func:`classify_review_signal` label that distinguishes over-flag / under-flag
+    mistakes for later analysis."""
     diag = math.hypot(image_width, image_height)
     auto_ordered = None if auto_quad is None else order_corners(
         np.asarray(auto_quad, dtype=np.float32))
@@ -184,7 +235,20 @@ def build_record(
         "auto_quad": _quad_list(auto_ordered),
         "final_quad": _quad_list(final_ordered),
         "action": action,
-        "was_modified": action in ("modify", "manual_from_scratch"),
+        "was_modified": (was_modified := action in ("modify", "manual_from_scratch")),
+        # -- review-signal context + derived label (v3) ------------------ #
+        "verdict_level": verdict_level,
+        "verdict_reason": verdict_reason,
+        "was_flagged": (was_flagged := verdict_level != "good"),
+        "presented": bool(presented),
+        "was_auto_accepted": bool(was_auto_accepted),
+        "revised": bool(revised),
+        "prior_action": prior_action,
+        "prior_was_auto_accepted": bool(prior_was_auto_accepted),
+        "review_signal": classify_review_signal(
+            action=action, was_flagged=was_flagged, was_modified=was_modified,
+            was_auto_accepted=was_auto_accepted, revised=revised,
+            prior_was_auto_accepted=prior_was_auto_accepted),
         "display_scale": round(float(display_scale), 6),
         "output_path": None if output_path is None else str(output_path),
         "output_aspect_ratio": round(float(output_aspect_ratio), 4),
@@ -247,6 +311,65 @@ def append_record(record: dict) -> Path:
     with open(p, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     return p
+
+
+def _signal_for_record(rec: dict, review_threshold: float = 0.90) -> str:
+    """The review-signal label for one deduped record. Uses the stored ``review_signal``
+    when present (v3+); otherwise reconstructs it from whatever a v2 record carried so
+    old data still contributes to the analysis."""
+    if rec.get("review_signal") in REVIEW_SIGNALS:
+        return rec["review_signal"]
+    action = rec.get("action", "")
+    was_modified = rec.get("was_modified", action in ("modify", "manual_from_scratch"))
+    # v2 had no verdict; reconstruct the flag from the raw auto signals.
+    if "was_flagged" in rec:
+        was_flagged = bool(rec["was_flagged"])
+    else:
+        has_quad = rec.get("auto_quad") is not None
+        was_flagged = ((not has_quad) or bool(rec.get("auto_low_confidence"))
+                       or float(rec.get("auto_aspect_score", 0.0)) < review_threshold)
+    return classify_review_signal(
+        action=action, was_flagged=was_flagged, was_modified=was_modified,
+        was_auto_accepted=bool(rec.get("was_auto_accepted", False)),
+        revised=bool(rec.get("revised", False)),
+        prior_was_auto_accepted=bool(rec.get("prior_was_auto_accepted", False)))
+
+
+def review_signals(review_threshold: float = 0.90) -> dict:
+    """Management/analysis view over the whole decision log — the basis for building
+    a "does this detection need review?" classifier.
+
+    Returns ``{"counts": {label: n, ...}, "rows": [per-image dicts]}`` where each row
+    pairs the detector's confidence signals (backend, low-confidence fallback, aspect
+    & detect scores, corner delta) with the outcome label. The two error labels
+    (:data:`under_flag`, :data:`over_flag`) are the mislabeled cases a calibrated gate
+    must eliminate; filter on them to train or evaluate."""
+    rows: list[dict] = []
+    counts: dict[str, int] = {s: 0 for s in REVIEW_SIGNALS}
+    for rec in read_log():
+        signal = _signal_for_record(rec, review_threshold)
+        counts[signal] = counts.get(signal, 0) + 1
+        rows.append({
+            "source_sha1": rec.get("source_sha1"),
+            "source_name": rec.get("source_name"),
+            "review_signal": signal,
+            "verdict_level": rec.get("verdict_level"),
+            "was_flagged": rec.get("was_flagged"),
+            "presented": rec.get("presented"),
+            "was_auto_accepted": rec.get("was_auto_accepted"),
+            "action": rec.get("action"),
+            "was_modified": rec.get("was_modified"),
+            "revised": rec.get("revised"),
+            "prior_was_auto_accepted": rec.get("prior_was_auto_accepted"),
+            # detector confidence signals (classifier features)
+            "backend": rec.get("backend"),
+            "auto_low_confidence": rec.get("auto_low_confidence"),
+            "auto_aspect_score": rec.get("auto_aspect_score"),
+            "auto_detect_score": rec.get("auto_detect_score"),
+            "max_corner_delta_px": rec.get("max_corner_delta_px"),
+            "delta_norm": rec.get("delta_norm"),
+        })
+    return {"counts": counts, "rows": rows}
 
 
 def confidence_verdict(low_confidence: bool, aspect_score: float,

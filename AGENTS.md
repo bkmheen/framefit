@@ -157,6 +157,15 @@ Keep this file in sync with the code. Update when any of the below change.
 - **Headless regen**: `src/framefit/batch_replay.py`.
 
 ### Change log (agent-facing)
+- **2026-07-15** — Decision log schema **v3**: review-signal labels. Each record now
+  carries `verdict_level`/`was_flagged`/`presented`/`was_auto_accepted`/`revised`/
+  `prior_was_auto_accepted` + a derived `review_signal` ∈ {`under_flag`, `over_flag`,
+  `correct_flag`, `confirmed_pass`, `auto_pass`, `skip`}. `under_flag` (confident but
+  the human edited it) and `over_flag` (flagged but the human changed nothing) are the
+  review-gate's false-negative / false-positive — the training target for calibrating
+  it. `--only-flagged` auto-accepts are now reachable via `◀ 이전` so they can be
+  corrected (that correction = `under_flag`). Report: `python -m framefit.signals
+  [--errors] [--tsv PATH]`; API: `feedback.review_signals()` / `classify_review_signal()`.
 - **2026-07-15** — Review page gained a `◀ 이전` (back) button: step back to any
   image confirmed earlier in the session (including from the done screen), reloading
   the corners last set for re-editing. Server tracks a forward *frontier* vs. the

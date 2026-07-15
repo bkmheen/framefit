@@ -6,6 +6,19 @@ Versioning: `major.minor.patch` (initial major = 0).
 ## [Unreleased]
 
 ### Added
+- **Review-signal labels for calibrating the review gate (decision log schema v3).**
+  Every decision is now labeled with how the detector's confidence call related to
+  what the human did, so the two *mistakes* can be studied and eventually eliminated:
+  `under_flag` — confident (auto-accepted, or shown as "good") but the human still
+  changed the crop (should have asked); `over_flag` — flagged for review but the human
+  changed nothing (should not have asked). Plus `correct_flag` / `confirmed_pass` /
+  `auto_pass` / `skip`. Records gain `verdict_level`, `was_flagged`, `presented`,
+  `was_auto_accepted`, `revised`, `prior_was_auto_accepted`, and a derived
+  `review_signal`; `feedback.classify_review_signal()` is the single labeling rule and
+  `feedback.review_signals()` aggregates the log (v2 records reconstructed on read).
+  Crucially, `--only-flagged` auto-accepted images are now reachable by `◀ 이전`, so a
+  wrongly auto-accepted crop can be corrected — that correction is what produces an
+  `under_flag`. New report tool: `python -m framefit.signals [--errors] [--tsv PATH]`.
 - **`◀ 이전` (back) button in the review interface.** Previously the review page
   was forward-only: once you confirmed a crop and moved to the next image, there
   was no way to return. You can now step back to any image already confirmed in the
