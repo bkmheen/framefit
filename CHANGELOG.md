@@ -3,6 +3,27 @@
 All notable changes to framefit are recorded here.
 Versioning: `major.minor.patch` (initial major = 0).
 
+## [Unreleased]
+
+## [0.9.1] - 2026-07-15
+
+### Changed
+- **Beside-the-source is now the DEFAULT output rule.** A bare `framefit <imgs>`
+  (no `-o`, no `--beside`) writes each result next to its source with the **same
+  filename and a `.jpg` extension** — the standing convention: same name, extension
+  only changed, no arbitrary output directory. This applies uniformly whether a
+  human or another agent invokes framefit. Pass `-o DIR` to opt out and collect
+  crops elsewhere as `<stem>_framefit.<fmt>`. The `--beside` flag is now redundant
+  but still accepted for explicitness/back-compat. (`AGENTS.md` updated to match.)
+
+### Fixed
+- **`--beside` no longer creates a stray `framefit_out/`.** Previously, even with
+  `--beside` (write each crop next to its source), the batch QA report was still
+  written to the default `framefit_out/` directory, forcing an unwanted directory
+  into existence in the working dir. The report now lands in the common parent
+  directory of the crops (i.e. beside the sources), so `--beside` creates no
+  arbitrary output directory of its own.
+
 ## [0.9.0] - 2026-07-14
 
 ### Changed

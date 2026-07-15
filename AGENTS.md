@@ -7,7 +7,7 @@ as learning data.
 
 > This file is **kept up to date** as the module evolves. When you add/rename a
 > flag, change a path, or validate a new recipe, update the matching section and
-> the **Maintenance** log at the bottom. Last validated: **2026-07-14, v0.9.0**.
+> the **Maintenance** log at the bottom. Last validated: **2026-07-15, v0.9.1**.
 
 ---
 
@@ -36,11 +36,19 @@ until a human closes it. Do the headless batch instead; it still crops every ima
 human to refine later. This is the graceful split: agent produces the full first
 pass + the uncertain list; a human corrects the flagged corners afterward.
 
+**Default output rule (since v0.9.1):** a bare `framefit <imgs>` — no `-o`, no
+`--beside` — now writes each result **beside its source with the same filename and a
+`.jpg` extension**. This is the standing convention for both humans and agents: same
+name, extension only changed, no arbitrary output directory. Pass `-o DIR` only when
+you deliberately want the crops collected elsewhere (that opts out and writes
+`<stem>_framefit.<fmt>`). The `--beside` flag is now redundant but still accepted.
+
 ## 2. Validated recipes (all run & verified 2026-07-14)
 
 ```bash
-# (a) one image → write beside the source as <stem>.jpg, overwriting if present
-.venv/bin/framefit "/path/IMG_3634.HEIC" --beside --force
+# (a) one image → write beside the source as <stem>.jpg (this is the DEFAULT now;
+#     --beside is optional). --force overwrites an existing crop.
+.venv/bin/framefit "/path/IMG_3634.HEIC" --force
 
 # (b) every HEIC in ONE directory → beside-source .jpg
 .venv/bin/framefit "/path/source" --ext heic --beside --force
@@ -67,9 +75,9 @@ just those.
 
 | Flag | Effect |
 |------|--------|
-| `-o DIR` | output directory (default `framefit_out`); ignored when `--beside` |
+| `-o DIR` | output directory. **Opts out** of the default beside-the-source rule and writes `<stem>_framefit.<fmt>` here |
 | `-b {auto,classic,docaligner}` | detection backend (default `auto`) |
-| `--beside` | write result next to its source as `<stem>.jpg` (ignores `-o`) |
+| `--beside` | write result next to its source as `<stem>.jpg`. **This is the default** when no `-o` is given; flag kept for explicitness |
 | `--force` | overwrite an existing output (otherwise that file is skipped) |
 | `--ext heic[,jpg]` | when input is a directory, only these extensions |
 | `--recurse` | walk subdirectories of a directory input |
@@ -144,6 +152,10 @@ Keep this file in sync with the code. Update when any of the below change.
 - **Headless regen**: `src/framefit/batch_replay.py`.
 
 ### Change log (agent-facing)
+- **2026-07-15 (v0.9.1)** — Beside-the-source (same filename, `.jpg`) is now the
+  **default** output rule: a bare `framefit <imgs>` writes crops next to their sources
+  with no arbitrary output dir. `-o DIR` opts out (`<stem>_framefit.<fmt>`). `--beside`
+  kept for back-compat. Applies uniformly to humans and agents.
 - **2026-07-14 (v0.9.0)** — Multi-hypothesis classical detector (4 candidate cues +
   composite `score_quad`) replaces single-Otsu; fixes color-cast title-cut/ceiling
   grabs. Added `research/eval_against_log.py` (scores detectors vs the human review

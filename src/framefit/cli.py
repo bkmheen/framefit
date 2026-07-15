@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -51,8 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
                     "and crop to a clean full-frame image.",
     )
     p.add_argument("inputs", nargs="+", help="image file(s) or directory(ies)")
-    p.add_argument("-o", "--output", default="framefit_out",
-                   help="output directory (default: framefit_out)")
+    p.add_argument("-o", "--output", default=None,
+                   help="output directory. Giving this OPTS OUT of the default "
+                        "beside-the-source rule and writes <stem>_framefit.<fmt> "
+                        "here instead (falls back to ./framefit_out for the "
+                        "--pick/--review pages when omitted).")
     p.add_argument("-b", "--backend", default="auto",
                    choices=["auto", "classic", "docaligner"],
                    help="detection backend (default: auto)")
@@ -80,8 +84,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="longest side shown in the review page (default: 1400)")
     p.add_argument("--beside", action="store_true",
                    help="write each result next to its source with the SAME name "
-                        "and a .jpg extension (e.g. src/IMG.HEIC -> src/IMG.jpg), "
-                        "ignoring -o/--output")
+                        "and a .jpg extension (e.g. src/IMG.HEIC -> src/IMG.jpg). "
+                        "This is the DEFAULT when no -o/--output is given; the flag "
+                        "is kept for explicitness and back-compat.")
     p.add_argument("--force", action="store_true",
                    help="overwrite an existing output file (otherwise it is skipped)")
     p.add_argument("--ext", default=None,
@@ -134,7 +139,11 @@ def main(argv: list[str] | None = None) -> int:
         print("framefit: no input images found", file=sys.stderr)
         return 2
 
-    outdir = Path(args.output)
+    # Beside-the-source (same filename, .jpg) is the default output rule so a
+    # bare `framefit <imgs>` — the shape a human or another agent uses — never
+    # invents an arbitrary output directory. Passing -o/--output opts out.
+    beside = args.beside or args.output is None
+    outdir = Path(args.output) if args.output is not None else Path("framefit_out")
 
     # --pick: write an HTML corner-picker per input, don't process
     if args.pick:
@@ -152,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
                    display_max=args.display_max,
                    review_threshold=args.review_threshold,
                    out_format=args.format, quality=args.quality,
-                   beside=args.beside, force=args.force,
+                   beside=beside, force=args.force,
                    only_flagged=args.only_flagged)
         return 0
 
@@ -164,7 +173,7 @@ def main(argv: list[str] | None = None) -> int:
         from . import io
         from .pipeline import process_manual
         f = files[0]
-        dst = _dst_for(f, outdir, args.beside, args.format)
+        dst = _dst_for(f, outdir, beside, args.format)
         if dst.exists() and not args.force:
             print(f"framefit: {dst} exists — use --force to overwrite", file=sys.stderr)
             return 2
@@ -182,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         decided = feedback.decided_hashes()
     ok_count = 0
     rows = []  # (source, output, ok, ar, score, review)
+    dst_dirs = set()  # directories crops were written to (for --beside report placement)
     for f in files:
         if decided:
             from . import feedback
@@ -189,8 +199,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[reviewed] {f.name}: already hand-decided — skipped")
                 rows.append((str(f), "", 0, 0.0, 0.0, "-", "REVIEWED"))
                 continue
-        dst = _dst_for(f, outdir, args.beside, args.format)
+        dst = _dst_for(f, outdir, beside, args.format)
         out_name = dst.name
+        dst_dirs.add(dst.parent)
         if dst.exists() and not args.force:
             print(f"[skip] {f.name}: {dst.name} exists (use --force)", file=sys.stderr)
             rows.append((str(f), out_name, 0, 0.0, 0.0, "-", "SKIP"))
@@ -219,19 +230,27 @@ def main(argv: list[str] | None = None) -> int:
             rows.append((str(f), "", 0, 0.0, 0.0, "-", "MISS"))
             print(f"[miss] {f.name}: no slide detected", file=sys.stderr)
 
-    # QA report (#2): per-file score + review flag
+    # QA report (#2): per-file score + review flag.
+    # --beside creates no output dir of its own, so drop the report beside the
+    # sources (the common parent of where crops were written) instead of forcing
+    # an arbitrary framefit_out/ into existence.
     review_n = sum(1 for r in rows if r[6] in ("REVIEW", "MISS", "ERROR"))
+    if beside:
+        report_dir = (Path(os.path.commonpath([str(d) for d in dst_dirs]))
+                      if dst_dirs else Path.cwd())
+    else:
+        report_dir = outdir
     if rows:
-        outdir.mkdir(parents=True, exist_ok=True)
-        with open(outdir / "framefit_report.tsv", "w") as rep:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        with open(report_dir / "framefit_report.tsv", "w") as rep:
             rep.write("source\toutput\tok\taspect_ratio\tscore\tbackend\tstatus\n")
             for src, out, ok, ar, sc, be, st in rows:
                 rep.write(f"{src}\t{out}\t{ok}\t{ar:.3f}\t{sc:.3f}\t{be}\t{st}\n")
 
     print(f"\nframefit: {ok_count}/{len(files)} succeeded ({backend.name} backend)")
     if review_n:
-        print(f"         {review_n} flagged for review — see {outdir/'framefit_report.tsv'}")
-        print(f"         fix a flagged image manually:  framefit \"<img>\" --pick -o {outdir}")
+        print(f"         {review_n} flagged for review — see {report_dir/'framefit_report.tsv'}")
+        print(f"         fix a flagged image manually:  framefit \"<img>\" --pick -o {report_dir}")
     return 0 if ok_count else 1
 
 
