@@ -36,6 +36,30 @@ until a human closes it. Do the headless batch instead; it still crops every ima
 human to refine later. This is the graceful split: agent produces the full first
 pass + the uncertain list; a human corrects the flagged corners afterward.
 
+**Agent *can* correct corners — just not through the browser.** If you have 4 corner
+points from another source (a vision model, a heuristic, coordinates a human gave
+you), fix a single image **headlessly** with `--corners` (no server, returns
+immediately):
+
+```bash
+# corners are TL TR BR BL in ORIGINAL-image pixels
+.venv/bin/framefit "/path/IMG.HEIC" \
+    --corners "10,20 900,25 890,600 5,590" --force
+```
+
+Or produce a **corner-picker HTML** for a human with `--pick` (also headless — it
+just writes files and exits; it does **not** open a browser or block):
+
+```bash
+.venv/bin/framefit "/path/tricky.HEIC" --pick -o /path/out
+# writes /path/out/tricky_pick.html; a human opens it, clicks 4 corners,
+# and runs the --corners command it prints.
+```
+
+So the full agent toolkit is: **auto batch** (default), **`--corners`** for a known
+fix, **`--pick`** to hand a picker to a human — all non-blocking. Only `--review` is
+off-limits.
+
 **Default output rule (since v0.9.1):** a bare `framefit <imgs>` — no `-o`, no
 `--beside` — now writes each result **beside its source with the same filename and a
 `.jpg` extension**. This is the standing convention for both humans and agents: same
@@ -92,6 +116,15 @@ just those.
 | `--only-flagged` | review mode: auto-accept confident images, only stop on flagged ones |
 | `--display-max N` | longest side shown in the review page (default 1400) |
 | `--review-threshold F` | flag `aspect_score < F` for review (default 0.90) |
+| **Geometry / output shaping (headless, agent-relevant)** | |
+| `--expand F` | grow the detected quad outward by fraction `F` as a safety margin so a slightly-off detection never crops into content (**default 0.04** — already on) |
+| `--inset F` | trim a bezel by moving corners **inward** by fraction `F` (e.g. `0.01`); default 0 |
+| `--no-refine` | disable the post-warp trim of dark border margins (refine is on by default) |
+| `--corners "TL TR BR BL"` | **headless manual mode**, single image: crop from 4 `x,y` corners in original-image pixels. Non-blocking |
+| `--pick` | **headless**: write an HTML corner-picker per input to the output dir and exit (does *not* open a browser). For handing flagged images to a human |
+| `-f, --format {jpg,png}` | output format when `-o DIR` is used (default `jpg`; beside-mode is always `.jpg`) |
+| `--quality N` | JPEG quality 1–100 (default 95) |
+| `--detect-max N` | longest side used for detection (default 1400); raise for tiny/far slides |
 
 ## 4. Confidence self-assessment (Module A output)
 
@@ -157,6 +190,13 @@ Keep this file in sync with the code. Update when any of the below change.
 - **Headless regen**: `src/framefit/batch_replay.py`.
 
 ### Change log (agent-facing)
+- **2026-07-15** — Doc sync: the flags table now covers the headless geometry/
+  output-shaping flags an agent actually reaches for (`--expand` [on by default at
+  0.04], `--inset`, `--no-refine`, `--corners`, `--pick`, `-f/--format`, `--quality`,
+  `--detect-max`). §1 gained the **browser-free corner-correction** path: an agent can
+  fix a single image with `--corners "TL TR BR BL"` or hand a human a `--pick` HTML —
+  both non-blocking. Only `--review` remains agent-off-limits. (README de-staled to
+  v0.9.1 / beside-source default; `pyproject.toml` version aligned to 0.9.1.)
 - **2026-07-15** — Decision log schema **v3**: review-signal labels. Each record now
   carries `verdict_level`/`was_flagged`/`presented`/`was_auto_accepted`/`revised`/
   `prior_was_auto_accepted` + a derived `review_signal` ∈ {`under_flag`, `over_flag`,

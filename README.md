@@ -1,6 +1,6 @@
 # framefit
 
-**Version:** 0.8.0
+**Version:** 0.9.1
 
 Detect a document or presentation slide inside a photo, correct its perspective,
 and crop it to a clean full-frame image.
@@ -19,10 +19,15 @@ selected the approach.
 
 ```bash
 # a single photo, a list, or whole directories
-framefit photo.jpg                       # -> framefit_out/photo_framefit.jpg
-framefit slides/ -o out/ -f png          # batch a folder, PNG output
+framefit photo.jpg                       # -> photo.jpg's folder, as photo.jpg (beside-source; the default)
+framefit slides/ -o out/ -f png          # collect crops elsewhere: out/<stem>_framefit.png
 framefit talk.heic -b docaligner --inset 0.01   # DL backend, trim a thin bezel
 ```
+
+By default (no `-o`) a crop is written **beside its source with the same name and a
+`.jpg` extension** — framefit never invents an arbitrary output directory. Pass
+`-o DIR` only when you want the crops collected elsewhere (that writes
+`<stem>_framefit.<fmt>`).
 
 Batch runs write `framefit_report.tsv` and flag hard shots for review (⚠ REVIEW —
 e.g. the deep-learning detector fell back to the classical core). Fix a flagged
@@ -31,7 +36,7 @@ image by hand with the corner picker:
 ```bash
 framefit tricky.heic --pick -o out/      # writes out/tricky_pick.html
 # open the HTML, click the 4 slide corners, then run the command it prints:
-framefit tricky.heic --corners "x1,y1 x2,y2 x3,y3 x4,y4" -o out/
+framefit tricky.heic --corners "x1,y1 x2,y2 x3,y3 x4,y4"
 ```
 
 ### Semi-automatic review + learning dataset
