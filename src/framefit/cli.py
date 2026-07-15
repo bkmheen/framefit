@@ -157,10 +157,15 @@ def main(argv: list[str] | None = None) -> int:
     # --review: interactive browser review loop (A propose → B edit → C crop + log)
     if args.review:
         from .review_server import run_review
+        # By default present EVERY selected image for (re-)review, including ones
+        # already decided in a prior run — a human explicitly asking to review a
+        # file wants to correct it again. --skip-decided opts back into the
+        # resume-safety behavior that protects earlier hand-corrections.
         run_review(files, outdir, backend=args.backend,
                    display_max=args.display_max,
                    review_threshold=args.review_threshold,
                    out_format=args.format, quality=args.quality,
+                   skip_decided=args.skip_decided,
                    beside=beside, force=args.force,
                    only_flagged=args.only_flagged)
         return 0

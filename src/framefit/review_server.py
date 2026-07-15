@@ -316,16 +316,19 @@ class _Handler(BaseHTTPRequestHandler):
 
 def run_review(files, outdir, backend="auto", display_max=1400,
                review_threshold=0.90, out_format="jpg", quality=95,
-               open_browser=True, beside=False, force=False,
+               open_browser=True, skip_decided=True, beside=False, force=False,
                only_flagged=False) -> int:
     """Boot the review server, open the browser, block until the queue is done
-    or the user quits. Returns the number of images cropped."""
+    or the user quits. Returns the number of images cropped. ``skip_decided``
+    auto-skips images already decided in the review log (resume-safety); pass
+    False to re-present a previously-decided image for correction."""
     if not files:
         print("framefit review: no input images")
         return 0
     state = ReviewState(files, outdir, backend=backend, display_max=display_max,
                         review_threshold=review_threshold,
                         out_format=out_format, quality=quality,
+                        skip_decided=skip_decided,
                         beside=beside, force=force, only_flagged=only_flagged)
 
     handler = type("_H", (_Handler,), {"state": state})

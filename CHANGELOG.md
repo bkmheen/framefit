@@ -5,6 +5,16 @@ Versioning: `major.minor.patch` (initial major = 0).
 
 ## [Unreleased]
 
+### Fixed
+- **`--review` can now re-open an already-decided image for correction.** Review
+  mode always auto-skipped any image with a prior decision in the review log, with
+  no way to override it — a human asking to re-adjust a single already-decided file
+  got a "완료 (이전 결정 건너뜀)" screen instead of the editor. The CLI now threads
+  `--skip-decided` into review mode (default off), and `run_review()` takes a
+  `skip_decided` parameter. A bare `framefit "<img>" --review` re-presents the image
+  for editing; pass `--skip-decided` to keep the resume-safety behavior that protects
+  earlier hand-corrections.
+
 ## [0.9.1] - 2026-07-15
 
 ### Changed

@@ -59,9 +59,14 @@ you deliberately want the crops collected elsewhere (that opts out and writes
     --recurse --under source --ext heic --beside --force --skip-decided
 
 # (d) HUMAN PASS — review only the low-confidence/flagged images, gathered
-#     into one queue, auto-accepting the confident ones (opens a browser)
+#     into one queue, auto-accepting the confident ones (opens a browser).
+#     --skip-decided makes this pass resumable: images already hand-corrected in
+#     a prior run are left untouched. OMIT it to re-open an already-decided image.
 .venv/bin/framefit "/path/2026-07-13_월" \
-    --recurse --under source --ext heic --review --only-flagged --beside --force
+    --recurse --under source --ext heic --review --only-flagged --beside --force --skip-decided
+
+# (d2) re-adjust ONE already-decided image (no --skip-decided → it is re-presented)
+.venv/bin/framefit "/path/IMG_3735.HEIC" --review --beside --force
 
 # (e) headless regeneration of all crops from the decision log (no browser)
 .venv/bin/python -m framefit.batch_replay "/path/out_dir"
@@ -82,8 +87,8 @@ just those.
 | `--ext heic[,jpg]` | when input is a directory, only these extensions |
 | `--recurse` | walk subdirectories of a directory input |
 | `--under DIRNAME` | with `--recurse`, keep only files under a `DIRNAME/` folder (e.g. `--under source`) |
-| `--skip-decided` | skip images already decided in the review log — **protects hand-corrected crops** on a re-run |
-| `--review` | **human/browser** interactive corner confirm/edit loop |
+| `--skip-decided` | skip images already decided in the review log — **protects hand-corrected crops** on a re-run. Also honored in `--review` mode now; **omit it to re-open an already-decided image for correction** |
+| `--review` | **human/browser** interactive corner confirm/edit loop. By default re-presents even already-decided images (add `--skip-decided` to skip them) |
 | `--only-flagged` | review mode: auto-accept confident images, only stop on flagged ones |
 | `--display-max N` | longest side shown in the review page (default 1400) |
 | `--review-threshold F` | flag `aspect_score < F` for review (default 0.90) |
@@ -152,6 +157,10 @@ Keep this file in sync with the code. Update when any of the below change.
 - **Headless regen**: `src/framefit/batch_replay.py`.
 
 ### Change log (agent-facing)
+- **2026-07-15** — `--review` no longer force-skips images already decided in the
+  review log. It honors `--skip-decided` (default off), so a bare `--review`
+  re-opens a decided image for correction; add `--skip-decided` to keep a batch
+  human pass resumable. `run_review()` gained a `skip_decided` parameter.
 - **2026-07-15 (v0.9.1)** — Beside-the-source (same filename, `.jpg`) is now the
   **default** output rule: a bare `framefit <imgs>` writes crops next to their sources
   with no arbitrary output dir. `-o DIR` opts out (`<stem>_framefit.<fmt>`). `--beside`
