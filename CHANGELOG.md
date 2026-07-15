@@ -5,6 +5,17 @@ Versioning: `major.minor.patch` (initial major = 0).
 
 ## [Unreleased]
 
+### Added
+- **`◀ 이전` (back) button in the review interface.** Previously the review page
+  was forward-only: once you confirmed a crop and moved to the next image, there
+  was no way to return. You can now step back to any image already confirmed in the
+  session — including from the "완료" screen — and it **reloads the corners you last
+  set** (not a fresh auto-detect) so you tweak rather than redo. Saving a revisited
+  image overwrites its earlier crop and jumps back to where you were. Internally the
+  server now tracks a forward *frontier* separate from the displayed index, records
+  each session decision + its final quad, and exposes `can_back`/`prev_disp`/`revisit`
+  in `/state` plus an `action:"back"` on `/decide`.
+
 ### Fixed
 - **`--review` can now re-open an already-decided image for correction.** Review
   mode always auto-skipped any image with a prior decision in the review log, with

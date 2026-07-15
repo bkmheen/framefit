@@ -157,6 +157,11 @@ Keep this file in sync with the code. Update when any of the below change.
 - **Headless regen**: `src/framefit/batch_replay.py`.
 
 ### Change log (agent-facing)
+- **2026-07-15** — Review page gained a `◀ 이전` (back) button: step back to any
+  image confirmed earlier in the session (including from the done screen), reloading
+  the corners last set for re-editing. Server tracks a forward *frontier* vs. the
+  displayed index; `/state` now returns `can_back`/`prev_disp`/`revisit` and `/decide`
+  accepts `action:"back"`. Human-facing only — agents still never run `--review`.
 - **2026-07-15** — `--review` no longer force-skips images already decided in the
   review log. It honors `--skip-decided` (default off), so a bare `--review`
   re-opens a decided image for correction; add `--skip-decided` to keep a batch

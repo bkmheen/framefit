@@ -67,6 +67,14 @@ class ReviewState:
         self.decided = decided
         self.idx = 0
         self._advance_to_undecided()
+        # forward frontier vs. currently-displayed idx: they match during normal
+        # forward review. After a "이전으로" (back) jump, idx < frontier and we are
+        # re-editing an already-confirmed image; saving/skipping a revisit returns
+        # to the frontier instead of advancing past it.
+        self.frontier = self.idx
+        self.session_decided = []   # queue indices decided this session, in order
+        self.session_actions = {}   # idx -> "save" | "skip"
+        self.saved_full = {}        # idx -> final full-res quad (None if skipped)
 
     # -- queue movement --------------------------------------------------- #
     def _advance_to_undecided(self):
@@ -146,21 +154,30 @@ class ReviewState:
                     "verdict": verdict,
                 }
                 # --only-flagged: silently auto-accept confident detections so the
-                # interface only surfaces the problematic ones.
+                # interface only surfaces the problematic ones. Forward-only: never
+                # auto-accept an image being revisited via "이전으로".
                 if (self.only_flagged and verdict["level"] == "good"
-                        and auto_full is not None):
+                        and auto_full is not None
+                        and self.idx == self.frontier
+                        and self.idx not in self.session_actions):
                     full = order_corners(np.asarray(auto_full, dtype=np.float32))
-                    res = self._finalize_crop(prep, full, "accept")
+                    res = self._write_crop_and_log(prep, full, "accept",
+                                                   allow_overwrite=self.force)
                     if res.get("ok"):
                         self.auto_accepted += 1
-                    else:                       # can't write (exists, no --force)
-                        self.idx += 1           # advance anyway — never loop
-                        self._advance_to_undecided()
+                    self.idx += 1               # advance regardless — never loop
+                    self._advance_to_undecided()
+                    self.frontier = self.idx
                     continue
                 self._prepared = prep
                 return self._prepared
             self._prepared = None
             return None
+
+    def _can_back(self) -> bool:
+        """True when some image decided this session sits before the current one —
+        i.e. there is a previous confirmed image to return to."""
+        return any(i < self.idx for i in self.session_decided)
 
     def state_json(self) -> dict:
         prep = self._prepare_current()
@@ -172,7 +189,16 @@ class ReviewState:
                 "skipped": self.skipped_count,
                 "pre_decided": self._pre_decided,
                 "auto_accepted": self.auto_accepted,
+                "can_back": self._can_back(),
             }
+        # When revisiting an already-confirmed image, reload the corners the human
+        # last set (full-res → display coords) so they can be tweaked, not redone.
+        saved = self.saved_full.get(self.idx)
+        prev_disp = None
+        if saved:
+            sc = prep["scale"]
+            prev_disp = [[round(float(x * sc), 2), round(float(y * sc), 2)]
+                         for x, y in saved]
         return {
             "done": False,
             "index": self.idx,
@@ -182,6 +208,9 @@ class ReviewState:
             "image_b64": prep["image_b64"],
             "disp_w": prep["disp_w"], "disp_h": prep["disp_h"],
             "auto_disp": prep["auto_disp"],
+            "prev_disp": prev_disp,
+            "revisit": self.idx in self.session_actions,
+            "can_back": self._can_back(),
             "backend": prep["backend"],
             "low_confidence": prep["low_confidence"],
             "aspect_score": round(float(prep["aspect_score"]), 3),
@@ -190,34 +219,38 @@ class ReviewState:
 
     def decide(self, action: str, corners_disp) -> dict:
         """Apply a decision for the current image, log it, advance. ``corners_disp``
-        are 4 [x,y] in DISPLAY coords (ignored for skip)."""
+        are 4 [x,y] in DISPLAY coords (ignored for skip/back). ``action`` "back"
+        returns to the previous confirmed image — with its saved corners reloaded —
+        for re-editing."""
         with self._lock:
+            if action == "back":
+                return self._go_back()
             prep = self._prepare_current()
             if prep is None:
                 return {"ok": False, "error": "queue empty"}
 
+            idx0 = self.idx
+            revisit = idx0 < self.frontier
             inv = prep["inv"]
             auto_full = prep["auto_full"]
-            base = dict(
-                source_path=prep["path"], source_sha1=prep["sha1"],
-                image_width=prep["width"], image_height=prep["height"],
-                backend=prep["backend"],
-                auto_low_confidence=prep["low_confidence"],
-                auto_aspect_score=prep["aspect_score"],
-                auto_detect_score=prep.get("detect_score"),
-                auto_quad=auto_full, display_scale=prep["scale"],
-            )
 
             if action == "skip":
                 orig_rel, _ = feedback.store_dataset(prep["sha1"], prep["bgr"], None)
                 rec = feedback.build_record(
-                    **base, final_quad=None, action="skip",
+                    source_path=prep["path"], source_sha1=prep["sha1"],
+                    image_width=prep["width"], image_height=prep["height"],
+                    backend=prep["backend"],
+                    auto_low_confidence=prep["low_confidence"],
+                    auto_aspect_score=prep["aspect_score"],
+                    auto_detect_score=prep.get("detect_score"),
+                    auto_quad=auto_full, display_scale=prep["scale"],
+                    final_quad=None, action="skip",
                     output_path=None, dataset_original=orig_rel, dataset_crop=None)
                 feedback.append_record(rec)
-                self.skipped_count += 1
                 self.decided.add(prep["sha1"])
-                self.idx += 1
-                self._advance_to_undecided()
+                self.saved_full[idx0] = None
+                self._record_action(idx0, "skip")
+                self._navigate_after(idx0, revisit)
                 return {"ok": True, "action": "skip"}
 
             # save: map display corners -> full-res
@@ -235,16 +268,56 @@ class ReviewState:
                 max_delta = float(np.linalg.norm(full - auto_ord, axis=1).max())
                 action_kind = "accept" if max_delta <= 1.0 else "modify"
 
-            return self._finalize_crop(prep, full, action_kind)
+            # A revisit save always overwrites the crop it wrote earlier this
+            # session, regardless of --force.
+            res = self._write_crop_and_log(prep, full, action_kind,
+                                           allow_overwrite=(revisit or self.force))
+            if not res.get("ok"):
+                return res
+            self.saved_full[idx0] = [[float(x), float(y)] for x, y in full]
+            self._record_action(idx0, "save")
+            self._navigate_after(idx0, revisit)
+            return res
 
-    def _finalize_crop(self, prep, full, action_kind) -> dict:
-        """Warp → save (beside/force-aware) → store dataset → log → advance.
-        Shared by the interactive save path and the ``--only-flagged`` auto-accept
-        of high-confidence images."""
+    # -- decision bookkeeping / navigation -------------------------------- #
+    def _record_action(self, idx, kind):
+        """Remember this session's decision for ``idx`` and recompute the visible
+        counters (idempotent, so re-deciding a revisited image never double-counts)."""
+        self.session_actions[idx] = kind
+        if idx not in self.session_decided:
+            self.session_decided.append(idx)
+        self.done_count = sum(1 for v in self.session_actions.values() if v == "save")
+        self.skipped_count = sum(1 for v in self.session_actions.values() if v == "skip")
+
+    def _navigate_after(self, idx0, revisit):
+        """After a save/skip: a revisit hops back to the live frontier; a normal
+        forward decision advances the frontier to the next undecided image."""
+        if revisit:
+            self.idx = self.frontier
+        else:
+            self.idx = idx0 + 1
+            self._advance_to_undecided()
+            self.frontier = self.idx
+        self._prepared = None
+
+    def _go_back(self) -> dict:
+        """Jump to the nearest image decided this session that sits before the
+        current one, leaving the frontier untouched."""
+        prev = max((i for i in self.session_decided if i < self.idx), default=None)
+        if prev is None:
+            return {"ok": False, "error": "이전 항목이 없습니다"}
+        self.idx = prev
+        self._prepared = None
+        return {"ok": True, "action": "back", "index": prev}
+
+    def _write_crop_and_log(self, prep, full, action_kind, allow_overwrite) -> dict:
+        """Warp → save (beside/force-aware) → store dataset → log. Does NOT touch
+        counters or the queue position — callers own navigation. Shared by the
+        interactive save path and the ``--only-flagged`` auto-accept."""
         src = prep["path"]
         dst = (src.parent / f"{src.stem}.jpg" if self.beside
                else self.outdir / f"{src.stem}_framefit.{self.out_format}")
-        if dst.exists() and not self.force:
+        if dst.exists() and not allow_overwrite:
             return {"ok": False, "error": f"{dst.name} 이미 존재 — --force 필요"}
         r = process_manual(prep["bgr"], full, refine=False)
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -263,10 +336,7 @@ class ReviewState:
             output_aspect_ratio=r.aspect_ratio, output_aspect_score=r.aspect_score,
             dataset_original=orig_rel, dataset_crop=crop_rel)
         feedback.append_record(rec)
-        self.done_count += 1
         self.decided.add(prep["sha1"])
-        self.idx += 1
-        self._advance_to_undecided()
         return {"ok": True, "action": action_kind, "output": str(dst),
                 "aspect_score": round(float(r.aspect_score), 3)}
 
@@ -395,6 +465,7 @@ _PAGE = r"""<!doctype html><html lang="ko"><meta charset="utf-8">
 <div id="stagewrap"><div id="stage"><img id="img"><svg id="svg" preserveAspectRatio="none"></svg></div></div>
 <div id="done" style="display:none"></div>
 <div id="bar">
+ <button id="back">◀ 이전</button>
  <button id="save" class="primary">저장 (OK)</button>
  <button id="reset">원위치</button>
  <button id="skip">건너뛰기</button>
@@ -414,6 +485,10 @@ function computeFit(){
 async function load(){
  const s=await (await fetch('/state')).json();
  if(s.done){finish(s);return;}
+ // returning from the done screen (via 이전): un-hide the editor
+ wrap.style.display='';document.getElementById('bar').style.display='';
+ document.querySelector('header').style.display='';
+ document.getElementById('done').style.display='none';
  document.getElementById('name').textContent=s.name;
  const b=document.getElementById('badge');
  b.textContent=s.verdict.label; b.className='badge '+s.verdict.level;
@@ -426,10 +501,15 @@ async function load(){
  img.src='data:image/jpeg;base64,'+s.image_b64;
  svg.setAttribute('viewBox','0 0 '+dispW+' '+dispH);
  auto=s.auto_disp;
- pts=auto?auto.map(p=>[p[0],p[1]]):[];
- document.getElementById('hint').textContent = auto
-   ? '핸들을 드래그해 모서리를 맞추세요. 맞으면 저장(OK).'
-   : '자동검출 실패 — 이미지 위 네 모서리를 순서대로(좌상→우상→우하→좌하) 클릭.';
+ // a revisited image reloads the corners last confirmed; otherwise start from auto
+ const init = s.prev_disp || auto;
+ pts = init ? init.map(p=>[p[0],p[1]]) : [];
+ document.getElementById('back').disabled = !s.can_back;
+ document.getElementById('hint').textContent =
+   (s.revisit ? '↩ 이전에 확정한 항목 — 저장했던 모서리를 불러왔습니다. 고친 뒤 저장하면 원래 위치로 돌아갑니다. ' : '')
+   + (auto
+      ? '핸들을 드래그해 모서리를 맞추세요. 맞으면 저장(OK).'
+      : '자동검출 실패 — 이미지 위 네 모서리를 순서대로(좌상→우상→우하→좌하) 클릭.');
  computeFit();render();
 }
 function finish(s){
@@ -440,7 +520,10 @@ function finish(s){
  d.innerHTML=`✅ 완료 — 크롭 ${s.decided}장, 건너뜀 ${s.skipped}장`+
    (s.auto_accepted?`, 자동수락 ${s.auto_accepted}장`:'')+
    (s.pre_decided?`, 이전 결정 ${s.pre_decided}장 건너뜀`:'')+
-   `<br><br>이 탭을 닫으셔도 됩니다.`;
+   `<br><br>`+
+   (s.can_back?`<button id="backdone">◀ 이전 항목으로 돌아가 수정</button><br><br>`:'')+
+   `이 탭을 닫으셔도 됩니다.`;
+ if(s.can_back){document.getElementById('backdone').onclick=()=>post({action:'back'});}
 }
 function render(){
  stage.style.width=(dispW*fit)+'px';stage.style.height=(dispH*fit)+'px';
@@ -478,6 +561,7 @@ document.getElementById('save').onclick=async()=>{
  if(pts.length!==4)return;
  await post({action:'save',corners:pts});};
 document.getElementById('skip').onclick=async()=>{await post({action:'skip'});};
+document.getElementById('back').onclick=async()=>{await post({action:'back'});};
 document.getElementById('quit').onclick=async()=>{
  await fetch('/quit');document.getElementById('done').style.display='block';
  document.getElementById('done').textContent='종료했습니다. 탭을 닫으세요.';
